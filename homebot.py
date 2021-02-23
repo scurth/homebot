@@ -2,13 +2,19 @@
 """Telegram Bot for Home automation tasks"""
 import configparser
 import re
+import time
 import signal
 import qrcode
+import collections
+import json
 import telepot
 import telepot.api
 from telepot.loop import MessageLoop
 from telepot.namedtuple import InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton
+import paho.mqtt.client as mqtt
+
 signal.signal(signal.SIGINT, signal.SIG_DFL)
+
 
 def generateQR(data):
     qr = qrcode.QRCode(
@@ -27,6 +33,7 @@ def generateQR(data):
 
 def main(argv=None):
     global debug
+    dhcpQueue = collections.deque(maxlen=10)
 
     def debug_log(logmessage):
         global debug
@@ -42,6 +49,39 @@ def main(argv=None):
             print("shall not log" + debug)
         return
 
+    def mqtt_on_log(client, userdata, level, buf):
+        debug_log("mqtt_log: ", buf)
+
+    def mqtt_on_connect(client, userdata, flags, resultCode):
+        debug_log("MQTT connect resultCode: " + str(resultCode))
+        if resultCode==0:
+            client.connected_flag=True
+            debug_log("MQTT connected OK Returned code:" + str(resultCode))
+            client.subscribe("dhcpd/#")
+        else:
+            debug_log("Bad connection Returned code= ",resultCode)
+
+    def mqtt_on_disconnect(client, userdata, resultCode):
+        debug_log("disconnecting reason  "  +str(resultCode))
+        client.connected_flag=False
+        client.disconnect_flag=True
+
+    def mqtt_on_message(client, userdata, msg):
+        mqtt_msg_json_obj = json.loads(msg.payload)
+        if msg.topic.startswith("dhcpd"):
+            deviceName = msg.topic.split('/')[1]
+            try:
+                ipAddress = mqtt_msg_json_obj.get("ip-address")
+                deviceName = mqtt_msg_json_obj.get("device-name")
+                macAdress = mqtt_msg_json_obj.get("mac-adress")
+                combinedValue = macAdress + " " + ipAddress + " " + deviceName
+                dhcpQueue.append(combinedValue)
+                debug_log(deviceName)
+            except:
+                raise
+        else:
+            debug_log("ignoring topic: ", msg.topic)
+
     def on_chat_message(msg):
         content_type, chat_type, chat_id = telepot.glance(msg)
         debug_log(str(content_type)+ str(chat_type)+ str(chat_id))
@@ -49,7 +89,8 @@ def main(argv=None):
         helptext = "Verfügbare Funktionen"
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text='WiFi Password', callback_data='wifipass')]
+            [InlineKeyboardButton(text='WiFi Password', callback_data='wifipass'),
+            InlineKeyboardButton(text='DHCP History', callback_data='dhcphistory')]
         ])
 
         if msg['text'].lower()[0] == "/":
@@ -88,8 +129,21 @@ def main(argv=None):
             imgpath = generateQR(qrwifi)
             bot.sendPhoto(bot_chatId, photo=open(imgpath, 'rb'))
             bot.sendMessage(bot_chatId, passwd)
+        elif query_data == 'dhcphistory':
+            for item in dhcpQueue:
+                mySendMessage(item)
 
         bot.answerCallbackQuery(query_id, text="Fertig", show_alert=0)
+
+    def mySendMessage(msg):
+        try:
+            debug_log("bot_chatId: " + str(bot_chatId) + " message: " + str(msg))
+            editable = bot.sendMessage(bot_chatId, str(msg))
+            time.sleep(0.01)
+            editable = telepot.message_identifier(editable)
+            return editable
+        except telepot.exception as e:
+            debug_log(e)
 
     bot_chatId = config.get("BotSettings", "bot_chatId")
     bot_token = config.get("BotSettings", "bot_token")
@@ -98,6 +152,33 @@ def main(argv=None):
     debug_log("debug state:" + str(debug))
     psk_file = config.get("WifiSettings", "pskfile")
     ssid = config.get("WifiSettings", "ssid")
+
+    global client
+    client = mqtt.Client("homebot")
+    client.connected_flag=False
+    client.on_log = mqtt_on_log
+    client.on_connect = mqtt_on_connect
+    client.on_disconnect = mqtt_on_disconnect
+    client.on_message = mqtt_on_message
+
+    try:
+        client.connect('localhost', 1883, keepalive=500)
+        debug_log("MQTT Connected: " + str(client.connected_flag))
+    except:
+        debug_log("mqtt_connect error")
+        raise
+
+    try:
+        client.loop_start()
+        debug_log("MQTT client.connected_flag:" + str(client.connected_flag))
+        while not client.connected_flag:
+            debug_log("Wait Loop, MQTT Connected: " + str(client.connected_flag))
+            time.sleep(1)
+    except:
+        debug_log("MQTT client.connected_flag:" + str(client.connected_flag))
+        debug_log("MQTT Client Loop Error")
+        raise
+
 
     def always_use_new(req, **user_kw):
         return None
@@ -112,6 +193,8 @@ def main(argv=None):
     except:
         debug_log("telepot intilialisation error")
         raise
+
+
 
 if __name__ == "__main__":
     main()
