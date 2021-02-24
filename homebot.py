@@ -4,9 +4,9 @@ import configparser
 import re
 import time
 import signal
-import qrcode
-import collections
 import json
+import collections
+import qrcode
 import telepot
 import telepot.api
 from telepot.loop import MessageLoop
@@ -54,17 +54,18 @@ def main(argv=None):
 
     def mqtt_on_connect(client, userdata, flags, resultCode):
         debug_log("MQTT connect resultCode: " + str(resultCode))
-        if resultCode==0:
-            client.connected_flag=True
+        if resultCode == 0:
+            client.connected_flag = True
             debug_log("MQTT connected OK Returned code:" + str(resultCode))
-            client.subscribe("dhcpd/#")
+            for topic in mqttTopics:
+                client.subscribe(topic + '/#')
         else:
-            debug_log("Bad connection Returned code= ",resultCode)
+            debug_log("Bad connection Returned code= ", resultCode)
 
     def mqtt_on_disconnect(client, userdata, resultCode):
         debug_log("disconnecting reason  "  +str(resultCode))
-        client.connected_flag=False
-        client.disconnect_flag=True
+        client.connected_flag = False
+        client.disconnect_flag = True
 
     def mqtt_on_message(client, userdata, msg):
         mqtt_msg_json_obj = json.loads(msg.payload)
@@ -79,6 +80,11 @@ def main(argv=None):
                 debug_log(deviceName)
             except:
                 raise
+        elif msg.topic.startswith(gargentorCallback):
+            toggleChannel = mqtt_msg_json_obj.get("channel")
+            if int(toggleChannel) == int(gargentorChannel):
+                mySendMessage("Gargentor geschaltet")
+            debug_log(mqtt_msg_json_obj)
         else:
             debug_log("ignoring topic: ", msg.topic)
 
@@ -90,7 +96,8 @@ def main(argv=None):
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text='WiFi Password', callback_data='wifipass'),
-            InlineKeyboardButton(text='DHCP History', callback_data='dhcphistory')]
+             InlineKeyboardButton(text='DHCP History', callback_data='dhcphistory')],
+            [InlineKeyboardButton(text='Garage', callback_data='garagedoor')]
         ])
 
         if msg['text'].lower()[0] == "/":
@@ -132,6 +139,8 @@ def main(argv=None):
         elif query_data == 'dhcphistory':
             for item in dhcpQueue:
                 mySendMessage(item)
+        elif query_data == 'garagedoor':
+            ret = client.publish(gargentorTopic, '{"channel":' + gargentorChannel + ', "value": true, "time": 1000}')
 
         bot.answerCallbackQuery(query_id, text="Fertig", show_alert=0)
 
@@ -142,8 +151,8 @@ def main(argv=None):
             time.sleep(0.01)
             editable = telepot.message_identifier(editable)
             return editable
-        except telepot.exception as e:
-            debug_log(e)
+        except telepot.exception as error:
+            debug_log(error)
 
     bot_chatId = config.get("BotSettings", "bot_chatId")
     bot_token = config.get("BotSettings", "bot_token")
@@ -153,9 +162,16 @@ def main(argv=None):
     psk_file = config.get("WifiSettings", "pskfile")
     ssid = config.get("WifiSettings", "ssid")
 
+    mqttTopics = config.get("MqttSubscribe", "MqttTopics").replace(' ', '').split(',')
+
+    gargentorTopic = config.get("Tinkerforge", "gargentorTopic")
+    gargentorChannel = config.get("Tinkerforge", "gargentorChannel")
+    garagenTorCallback = gargentorTopic.replace('request', 'callback')
+    debug_log(garagenTorCallback)
+
     global client
     client = mqtt.Client("homebot")
-    client.connected_flag=False
+    client.connected_flag = False
     client.on_log = mqtt_on_log
     client.on_connect = mqtt_on_connect
     client.on_disconnect = mqtt_on_disconnect
@@ -179,7 +195,6 @@ def main(argv=None):
         debug_log("MQTT Client Loop Error")
         raise
 
-
     def always_use_new(req, **user_kw):
         return None
 
@@ -193,8 +208,6 @@ def main(argv=None):
     except:
         debug_log("telepot intilialisation error")
         raise
-
-
 
 if __name__ == "__main__":
     main()
