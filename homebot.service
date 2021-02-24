@@ -1,0 +1,14 @@
+[Unit]
+Description=Homebot Telegram Service
+After=mosquitto.service
+StartLimitIntervalSec=10
+[Service]
+Type=simple
+Restart=always
+RestartSec=10
+User=pi
+ExecStart=/usr/bin/python3 /home/pi/sandbox/homebot/homebot.py
+WorkingDirectory=/home/pi/sandbox/homebot/
+
+[Install]
+WantedBy=multi-user.target
