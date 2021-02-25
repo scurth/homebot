@@ -79,7 +79,8 @@ def main(argv=None):
                 deviceName = mqtt_msg_json_obj.get("device-name")
                 macAdress = mqtt_msg_json_obj.get("mac-adress")
                 combinedValue = macAdress + " " + ipAddress + " " + deviceName
-                dhcpQueue.append(combinedValue)
+                if combinedValue not in dhcpQueue:
+                    dhcpQueue.append(combinedValue)
                 debug_log(deviceName)
             except:
                 raise
