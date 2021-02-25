@@ -13,3 +13,7 @@ MqttTopics = <comma seperated list of topics. the homebot.py will append '/#' to
 [Tinkerforge]
 gargentorTopic = tinkerforge/tiefgarage/request/industrial_quad_relay_v2_bricklet/G1e/set_monoflop
 gargentorChannel = 0
+
+[RSS]
+feeds = https://aws.amazon.com/about-aws/whats-new/recent/feed/, https://news.ycombinator.com/rss, https://news.google.com/rss/search?q={opensource}+when:1d
+

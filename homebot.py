@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 """Telegram Bot for Home automation tasks"""
 import configparser
+import feedparser
 import re
 import time
 import signal
@@ -11,6 +12,8 @@ import telepot
 import telepot.api
 from telepot.loop import MessageLoop
 from telepot.namedtuple import InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton
+from datetime import datetime, timedelta
+from dateutil.parser import parse
 import paho.mqtt.client as mqtt
 
 signal.signal(signal.SIGINT, signal.SIG_DFL)
@@ -97,7 +100,8 @@ def main(argv=None):
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text='WiFi Password', callback_data='wifipass'),
              InlineKeyboardButton(text='DHCP History', callback_data='dhcphistory')],
-            [InlineKeyboardButton(text='Garage', callback_data='garagedoor')]
+            [InlineKeyboardButton(text='Garage', callback_data='garagedoor')],
+            [InlineKeyboardButton(text='RSS Feeds', callback_data='rss')]
         ])
 
         if msg['text'].lower()[0] == "/":
@@ -141,13 +145,30 @@ def main(argv=None):
                 mySendMessage(item)
         elif query_data == 'garagedoor':
             ret = client.publish(gargentorTopic, '{"channel":' + gargentorChannel + ', "value": true, "time": 1000}')
+        elif query_data == 'rss':
+            for feed in rssfeeds:
+                feedname = "*" + feed.replace('https://','').split('/')[0] + "*"
+                debug_log(feedname)
+                mySendMessage(feedname, parse_mode='Markdown')
+                NewsFeed = feedparser.parse(feed)
+                past = datetime.now() - timedelta(days=1)
+                past = past.replace(tzinfo=None)
+                count = 0
+                for entry in NewsFeed.entries:
+                     rawdate = entry.published
+                     dt = parse(rawdate).replace(tzinfo=None)
+                     if dt > past:
+                         mySendMessage( "[" + entry.title + "](" + entry.link + ")",parse_mode = "Markdown", disable_web_page_preview = True  )
+                         count = count + 1
+                     if count == 10:
+                         break
 
         bot.answerCallbackQuery(query_id, text="Fertig", show_alert=0)
 
-    def mySendMessage(msg):
+    def mySendMessage(msg, parse_mode = "HTML", disable_web_page_preview = False ):
         try:
             debug_log("bot_chatId: " + str(bot_chatId) + " message: " + str(msg))
-            editable = bot.sendMessage(bot_chatId, str(msg))
+            editable = bot.sendMessage(bot_chatId, str(msg), parse_mode = parse_mode, disable_web_page_preview = disable_web_page_preview)
             time.sleep(0.01)
             editable = telepot.message_identifier(editable)
             return editable
@@ -163,6 +184,7 @@ def main(argv=None):
     ssid = config.get("WifiSettings", "ssid")
 
     mqttTopics = config.get("MqttSubscribe", "MqttTopics").replace(' ', '').split(',')
+    rssfeeds = config.get("RSS", "feeds").replace(' ', '').split(',')
 
     gargentorTopic = config.get("Tinkerforge", "gargentorTopic")
     gargentorChannel = config.get("Tinkerforge", "gargentorChannel")
