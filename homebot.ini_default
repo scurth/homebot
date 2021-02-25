@@ -1,0 +1,15 @@
+[BotSettings]
+bot_chatId = <chatId>
+bot_token = <token>
+debug = True
+
+[WifiSettings]
+pskfile = /etc/hostapd/keys/<your key file>
+ssid = <SSID>
+
+[MqttSubscribe]
+MqttTopics = <comma seperated list of topics. the homebot.py will append '/#' to each topic>
+
+[Tinkerforge]
+gargentorTopic = tinkerforge/tiefgarage/request/industrial_quad_relay_v2_bricklet/G1e/set_monoflop
+gargentorChannel = 0
