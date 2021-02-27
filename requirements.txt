@@ -2,3 +2,4 @@ telepot
 qrcode
 pillow
 feedparser
+pymysql
