@@ -3,3 +3,4 @@ qrcode
 pillow
 feedparser
 pymysql
+schedule

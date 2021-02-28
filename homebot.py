@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 """Telegram Bot for Home automation tasks"""
 import configparser
-import feedparser
 import re
 import time
 import signal
@@ -12,10 +11,9 @@ import telepot
 import telepot.api
 from telepot.loop import MessageLoop
 from telepot.namedtuple import InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton
-from datetime import datetime, timedelta
-from dateutil.parser import parse
 import paho.mqtt.client as mqtt
 from myCommon import myCommon
+import myRSS
 
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
@@ -78,7 +76,7 @@ def main(argv=None):
             myCommon.debug_log("ignoring topic: ", msg.topic)
 
     def on_chat_message(msg):
-        content_type, chat_type, chat_id, chat_date, chat_msg_id = telepot.glance(msg, long = True)
+        content_type, chat_type, chat_id, chat_date, chat_msg_id = telepot.glance(msg, long=True)
         myCommon.debug_log(str(content_type)+ str(chat_type)+ str(chat_id))
 
         helptext = "Verfügbare Funktionen"
@@ -116,6 +114,8 @@ def main(argv=None):
 
     def on_callback_query(msg):
         query_id, from_id, query_data = telepot.glance(msg, flavor='callback_query')
+        if query_data.startswith("{"):
+            query_data = json.loads(query_data)
 
         if query_data == 'wifipass':
             qrwifi = "WIFI:T:WPA;S:"
@@ -135,13 +135,44 @@ def main(argv=None):
             ret = client.publish(gargentorTopic, '{"channel":' + gargentorChannel + ', "value": true, "time": 1000}')
         elif query_data == 'rss':
             myCommon.debug_log("RSS FEEDS")
+            markup = InlineKeyboardMarkup(inline_keyboard=[])
+            feedkeyboard = []
+            for feed in myRSS.rssFetch.getFeeds():
+                print(feed['FEED_NAME'])
+                feedkeyboard.append(InlineKeyboardButton(text=feed['FEED_NAME'], callback_data='{"feed": "' + str(feed['FEED_NAME']) + '"}'))
+            markup = InlineKeyboardMarkup(inline_keyboard=[feedkeyboard])
+            bot.sendMessage(bot_chatId, "Welchen Feed?", reply_markup=markup)
+
+        elif query_data.get("feed"):
+            feedname = query_data['feed']
+            print(query_data)
+
+            for feedentry in myRSS.rssFetch.getFeedEntry(feedname):
+                feedlink = feedentry.get("FEED_LINK")
+                feedid = str(feedentry.get("id"))
+
+                markup = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text='Nein', callback_data='{"feedid": "' + feedid + '", "feeback": "n" }'),
+                 InlineKeyboardButton(text='Ja', callback_data='{"feedid": "' + feedid + '", "feeback": "j" }' )]
+                ])
+                bot.sendMessage(bot_chatId, feedlink, reply_markup=markup)
+
+        elif query_data.get("feedid"):
+             print(query_data)
+             print("feedback speichern")
+             print("feedback name herausfinden")
+
+#{'FEED_TITLE': 'A Vim Guide for Advanced Users', 'FEED_LINK': 'https://thevaluable.dev/vim-advanced/', 'FEED_PUBLISHED': datetime.datetime(2021, 2, 27, 13, 6, 30), 'id': 103}
+        else:
+            print("unklar")
+            print(query_data.get("feed"))
 
         bot.answerCallbackQuery(query_id, text="Fertig", show_alert=0)
 
-    def mySendMessage(msg, parse_mode = "HTML", disable_web_page_preview = False ):
+    def mySendMessage(msg, parse_mode="HTML", disable_web_page_preview=False):
         try:
             myCommon.debug_log("bot_chatId: " + str(bot_chatId) + " message: " + str(msg))
-            editable = bot.sendMessage(bot_chatId, str(msg), parse_mode = parse_mode, disable_web_page_preview = disable_web_page_preview)
+            editable = bot.sendMessage(bot_chatId, str(msg), parse_mode=parse_mode, disable_web_page_preview=disable_web_page_preview)
             time.sleep(0.01)
             editable = telepot.message_identifier(editable)
             return editable
@@ -155,7 +186,6 @@ def main(argv=None):
     ssid = config.get("WifiSettings", "ssid")
 
     mqttTopics = config.get("MqttSubscribe", "MqttTopics").replace(' ', '').split(',')
-    rssfeeds = config.get("RSS", "feeds").replace(' ', '').split(',')
 
     gargentorTopic = config.get("Tinkerforge", "gargentorTopic")
     gargentorChannel = config.get("Tinkerforge", "gargentorChannel")
