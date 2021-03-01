@@ -144,24 +144,38 @@ def main(argv=None):
 
         elif query_data.get("feed"):
             feedid = query_data['feed']
-            print(query_data)
+            print(feedid)
 
             for feedentry in myRSS.rssFetch.getFeedEntry(feedid):
                 feedlink = feedentry.get("FEED_LINK")
-                feedid = str(feedentry.get("id"))
+                feedtitle = feedentry.get("FEED_TITLE")
+                itemid = str(feedentry.get("id"))
 
                 markup = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text='Nein', callback_data='{"feedid": "' + feedid + '", "feeback": "n" }'),
-                 InlineKeyboardButton(text='Ja', callback_data='{"feedid": "' + feedid + '", "feeback": "j" }' )]
+                [InlineKeyboardButton(text='Nein', callback_data='{"feedid": "' + feedid + '","itemid": "' + itemid + '", "feeback": "n" }'),
+                 InlineKeyboardButton(text='Ja', callback_data='{"feedid": "' + feedid + '","itemid": "' + itemid + '", "feeback": "y" }')],
+                [InlineKeyboardButton(text='RSS Feed wechseln', callback_data='rss')]
                 ])
-                bot.sendMessage(bot_chatId, feedlink, reply_markup=markup)
+                bot.sendMessage(bot_chatId, feedtitle + "\n" + feedlink, reply_markup=markup)
 
         elif query_data.get("feedid"):
-             print(query_data)
-             print("feedback speichern")
-             print("feedback name herausfinden")
+            myRSS.rssFetch.setFeedEntryVote(query_data['itemid'], query_data['feeback'])
+            print(query_data.get("feedid"))
+            bot.answerCallbackQuery(query_id, text="Feedback gespeichert", show_alert=0)
+            feedid = query_data['feedid']
+            for feedentry in myRSS.rssFetch.getFeedEntry(feedid):
+                feedlink = feedentry.get("FEED_LINK")
+                feedtitle = feedentry.get("FEED_TITLE")
+                itemid = str(feedentry.get("id"))
 
-#{'FEED_TITLE': 'A Vim Guide for Advanced Users', 'FEED_LINK': 'https://thevaluable.dev/vim-advanced/', 'FEED_PUBLISHED': datetime.datetime(2021, 2, 27, 13, 6, 30), 'id': 103}
+                markup = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text='Nein', callback_data='{"feedid": "' + feedid + '","itemid": "' + itemid + '", "feeback": "n" }'),
+                 InlineKeyboardButton(text='Ja', callback_data='{"feedid": "' + feedid + '","itemid": "' + itemid + '", "feeback": "y" }')],
+                [InlineKeyboardButton(text='RSS Feed wechseln', callback_data='rss')]
+                ])
+                print(markup)
+                bot.sendMessage(bot_chatId, feedtitle + "\n" + feedlink, reply_markup=markup)
+
         else:
             print("unklar")
             print(query_data.get("feed"))

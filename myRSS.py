@@ -27,6 +27,16 @@ class rssFetch:
                          charset='utf8mb4',
                          cursorclass=pymysql.cursors.DictCursor)
 
+    def setFeedEntryVote(feedid,feeback):
+        sql = 'update feeds set liked = "%s" where id = %s' % (feeback, feedid)
+        updatecursor = connection.cursor()
+        try:
+            result = updatecursor.execute(sql)
+            connection.commit()
+        except Exception as e:
+            print(str(e))
+        updatecursor.close()
+
     def getFeeds():
         feedcursor = connection.cursor()
         sql = 'select FEED_NAME, rssid from `rss`'
@@ -41,8 +51,7 @@ class rssFetch:
 
     def getFeedEntry(feedid):
         feedcursor = connection.cursor()
-        sql = 'select FEED_TITLE, FEED_LINK, FEED_PUBLISHED, id  from `feeds` where rssid = "%s" and showed=0 order by RAND() limit 1' % (feedid)
-        print(sql)
+        sql = 'select FEED_TITLE, FEED_LINK, FEED_PUBLISHED, id  from `feeds` where rssid = "%s" and liked = "u" order by RAND() limit 1' % (feedid)
         try:
             result = feedcursor.execute(sql)
         except Exception as e:
@@ -76,10 +85,12 @@ class rssFetch:
                 rawdate = entry.published
                 dt = parse(rawdate).replace(tzinfo=None)
                 cursor = connection.cursor()
-                sql = 'insert ignore into `feeds` (`FEED_TITLE`,`FEED_LINK`,`FEED_PUBLISHED`,`rssid`) VALUES ("%s", "%s", "%s", "%s")' % (entry.title,entry.link ,dt, feedid)
+                title = entry.title.replace('"','')
+                sql = 'insert ignore into `feeds` (`FEED_TITLE`,`FEED_LINK`,`FEED_PUBLISHED`,`rssid`) VALUES ("%s", "%s", "%s", "%s")' % (title,entry.link ,dt, feedid)
                 try:
                     cursor.execute(sql)
                 except Exception as e:
+                    print(sql)
                     print(str(e))
                 connection.commit()
 
