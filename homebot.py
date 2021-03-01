@@ -138,16 +138,15 @@ def main(argv=None):
             markup = InlineKeyboardMarkup(inline_keyboard=[])
             feedkeyboard = []
             for feed in myRSS.rssFetch.getFeeds():
-                print(feed['FEED_NAME'])
-                feedkeyboard.append(InlineKeyboardButton(text=feed['FEED_NAME'], callback_data='{"feed": "' + str(feed['FEED_NAME']) + '"}'))
+                feedkeyboard.append(InlineKeyboardButton(text=feed['FEED_NAME'], callback_data='{"feed": "' + str(feed['rssid']) + '"}'))
             markup = InlineKeyboardMarkup(inline_keyboard=[feedkeyboard])
             bot.sendMessage(bot_chatId, "Welchen Feed?", reply_markup=markup)
 
         elif query_data.get("feed"):
-            feedname = query_data['feed']
+            feedid = query_data['feed']
             print(query_data)
 
-            for feedentry in myRSS.rssFetch.getFeedEntry(feedname):
+            for feedentry in myRSS.rssFetch.getFeedEntry(feedid):
                 feedlink = feedentry.get("FEED_LINK")
                 feedid = str(feedentry.get("id"))
 
