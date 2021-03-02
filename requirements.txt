@@ -4,3 +4,6 @@ pillow
 feedparser
 pymysql
 schedule
+isbnlib
+feedgen
+pytz

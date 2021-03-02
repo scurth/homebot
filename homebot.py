@@ -13,7 +13,7 @@ from telepot.loop import MessageLoop
 from telepot.namedtuple import InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton
 import paho.mqtt.client as mqtt
 from myCommon import myCommon
-import myRSS
+import my_rss
 
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
@@ -137,7 +137,7 @@ def main(argv=None):
             myCommon.debug_log("RSS FEEDS")
             markup = InlineKeyboardMarkup(inline_keyboard=[])
             feedkeyboard = []
-            for feed in myRSS.rssFetch.getFeeds():
+            for feed in my_rss.RssFetch.get_feeds():
                 feedkeyboard.append(InlineKeyboardButton(text=feed['FEED_NAME'], callback_data='{"feed": "' + str(feed['rssid']) + '"}'))
             markup = InlineKeyboardMarkup(inline_keyboard=[feedkeyboard])
             bot.sendMessage(bot_chatId, "Welchen Feed?", reply_markup=markup)
@@ -146,7 +146,7 @@ def main(argv=None):
             feedid = query_data['feed']
             print(feedid)
 
-            for feedentry in myRSS.rssFetch.getFeedEntry(feedid):
+            for feedentry in my_rss.RssFetch.get_feed_entry(feedid):
                 feedlink = feedentry.get("FEED_LINK")
                 feedtitle = feedentry.get("FEED_TITLE")
                 itemid = str(feedentry.get("id"))
@@ -159,11 +159,11 @@ def main(argv=None):
                 bot.sendMessage(bot_chatId, feedtitle + "\n" + feedlink, reply_markup=markup)
 
         elif query_data.get("feedid"):
-            myRSS.rssFetch.setFeedEntryVote(query_data['itemid'], query_data['feeback'])
+            my_rss.RssFetch.set_feed_entry_vote(query_data['itemid'], query_data['feeback'])
             print(query_data.get("feedid"))
             bot.answerCallbackQuery(query_id, text="Feedback gespeichert", show_alert=0)
             feedid = query_data['feedid']
-            for feedentry in myRSS.rssFetch.getFeedEntry(feedid):
+            for feedentry in my_rss.RssFetch.get_feed_entry(feedid):
                 feedlink = feedentry.get("FEED_LINK")
                 feedtitle = feedentry.get("FEED_TITLE")
                 itemid = str(feedentry.get("id"))
@@ -173,7 +173,6 @@ def main(argv=None):
                  InlineKeyboardButton(text='Ja', callback_data='{"feedid": "' + feedid + '","itemid": "' + itemid + '", "feeback": "y" }')],
                 [InlineKeyboardButton(text='RSS Feed wechseln', callback_data='rss')]
                 ])
-                print(markup)
                 bot.sendMessage(bot_chatId, feedtitle + "\n" + feedlink, reply_markup=markup)
 
         else:
