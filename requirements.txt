@@ -7,3 +7,4 @@ schedule
 isbnlib
 feedgen
 pytz
+boto3

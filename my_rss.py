@@ -86,8 +86,8 @@ class RssFetch:
                 rawdate = entry.published
                 tzdt = parse(rawdate).replace(tzinfo=None)
                 title = entry.title.replace('"', '')
-                sql = 'insert ignore into feeds (`FEED_TITLE`,`FEED_LINK`,`FEED_PUBLISHED`,`rssid`)'
-                sql = sql + ' VALUES ("%s", "%s", "%s", "%s")' % (title, entry.link, tzdt, feedid)
+                sql = 'insert ignore into feeds (`FEED_TITLE`,`FEED_LINK`,`FEED_PUBLISHED`,`rssid`,`description`)'
+                sql = sql + ' VALUES ("%s", "%s", "%s", "%s", "%s")' % (title, entry.link, tzdt, feedid, entry.description.replace('"',''))
                 mycursor = RssFetch.exec_sql(sql)
 
         mycursor.close()

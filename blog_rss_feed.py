@@ -3,7 +3,7 @@ import configparser
 from feedgen.feed import FeedGenerator
 from dateutil.parser import parse
 import pytz
-
+import boto3
 
 import pymysql
 from myCommon import myCommon
@@ -48,7 +48,7 @@ class RssFetch:
         return mycursor
 
     def get_feeds():
-        sql = 'select id,FEED_TITLE, FEED_LINK, FEED_PUBLISHED, last_updated from feeds where liked = "y" and last_updated >= DATE_ADD(CURDATE(), INTERVAL -3 DAY)'
+        sql = 'select id,FEED_TITLE, FEED_LINK, FEED_PUBLISHED, last_updated, description from feeds where liked = "y" and last_updated >= DATE_ADD(CURDATE(), INTERVAL -3 DAY)'
         mycursor = RssFetch.exec_sql(sql)
         result = mycursor.fetchall()
         return result
@@ -65,10 +65,15 @@ class RssFetch:
             fe.id(item['FEED_LINK'])
             fe.title(item['FEED_TITLE'])
             fe.link(href=item['FEED_LINK'], rel="alternate")
-            fe.pubDate(pytz.utc.localize(item['last_updated']))
+            fe.pubDate(pytz.utc.localize(item['FEED_PUBLISHED']))
+            fe.description(str(item['description']))
  
 #        result = fg.rss_str()
-        fg.rss_file('static/rss.xml') 
+        fg.rss_file('static/readers_digest_rss.xml') 
+
+        s3 = boto3.resource('s3')
+#        s3.meta.client.upload_file('static/readers_digest_rss.xml', 'sascha-curth.de', 'verification/readers_digest_rss.xml')
+        s3.meta.client.upload_file(CONFIG.get("AWS", "sourcefile"), CONFIG.get("AWS", "bucket"), CONFIG.get("AWS", "targetfile"))
 
 if __name__ == "__main__":
     # execute only if run as a script
