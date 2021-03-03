@@ -1,5 +1,6 @@
 import datetime
 import configparser
+from time import time
 from feedgen.feed import FeedGenerator
 from dateutil.parser import parse
 import pytz
@@ -48,7 +49,7 @@ class RssFetch:
         return mycursor
 
     def get_feeds():
-        sql = 'select id,FEED_TITLE, FEED_LINK, FEED_PUBLISHED, last_updated, description from feeds where liked = "y" and last_updated >= DATE_ADD(CURDATE(), INTERVAL -3 DAY)'
+        sql = 'select id,FEED_TITLE, FEED_LINK, FEED_PUBLISHED, last_updated, description from feeds where liked = "y" order by last_updated DESC limit 50'
         mycursor = RssFetch.exec_sql(sql)
         result = mycursor.fetchall()
         return result
@@ -72,8 +73,21 @@ class RssFetch:
         fg.rss_file('static/readers_digest_rss.xml') 
 
         s3 = boto3.resource('s3')
-#        s3.meta.client.upload_file('static/readers_digest_rss.xml', 'sascha-curth.de', 'verification/readers_digest_rss.xml')
         s3.meta.client.upload_file(CONFIG.get("AWS", "sourcefile"), CONFIG.get("AWS", "bucket"), CONFIG.get("AWS", "targetfile"))
+        client = boto3.client('cloudfront')
+        response = client.create_invalidation(
+            DistributionId=CONFIG.get("AWS", "distribution"),
+            InvalidationBatch={
+                'Paths': {
+                    'Quantity': 1,
+                    'Items': [
+                        '/readers_digest_rss.xml'
+                        ],
+                    },
+                'CallerReference': str(time()).replace(".", "")
+                }
+        )
+        print(response)
 
 if __name__ == "__main__":
     # execute only if run as a script
