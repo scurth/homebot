@@ -61,15 +61,16 @@ class RssFetch:
         fg.title("Sascha's Reader's Digest")
         fg.link( href='https://www.sascha-curth.de', rel='alternate' )
         fg.description('These news catched my attention.')
-        for item in feeds:
+        for item in sorted(feeds, key=lambda k: k['FEED_PUBLISHED'], reverse = False):
             fe = fg.add_entry()
             fe.id(item['FEED_LINK'])
             fe.title(item['FEED_TITLE'])
             fe.link(href=item['FEED_LINK'], rel="alternate")
             fe.pubDate(pytz.utc.localize(item['FEED_PUBLISHED']))
             fe.description(str(item['description']))
- 
-#        result = fg.rss_str()
+
+        sorted_fg = sorted(feeds, key=lambda k: k['FEED_PUBLISHED'], reverse = True)
+#        fg.rss_str()
         fg.rss_file('static/readers_digest_rss.xml') 
 
         s3 = boto3.resource('s3')
