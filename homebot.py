@@ -137,30 +137,42 @@ def main(argv=None):
             myCommon.debug_log("RSS FEEDS")
             markup = InlineKeyboardMarkup(inline_keyboard=[])
             feedkeyboard = []
-            for feed in my_rss.RssFetch.get_feeds():
-                feedkeyboard.append(InlineKeyboardButton(text=feed['FEED_NAME'], callback_data='{"feed": "' + str(feed['rssid']) + '"}'))
-            markup = InlineKeyboardMarkup(inline_keyboard=[feedkeyboard])
-            bot.sendMessage(bot_chatId, "Welchen Feed?", reply_markup=markup)
+            feednames = my_rss.RssFetch.get_feeds()
+            print(feednames)
+            if feednames:
+                for feed in feednames:
+                    buttontext = feed['FEED_NAME'] + " (" + str(feed['COUNT']) + ")"
+                    feedkeyboard.append(InlineKeyboardButton(text=buttontext, callback_data='{"feed": "' + str(feed['rssid']) + '"}'))
+                markup = InlineKeyboardMarkup(inline_keyboard=[feedkeyboard])
+                bot.sendMessage(bot_chatId, "Welchen Feed?", reply_markup=markup)
+            else:
+                bot.sendMessage(bot_chatId, "Keine neuen Nachrichten")
 
         elif query_data.get("feed"):
             feedid = query_data['feed']
             print(feedid)
 
-            for feedentry in my_rss.RssFetch.get_feed_entry(feedid):
-                feedlink = feedentry.get("FEED_LINK")
-                feedtitle = feedentry.get("FEED_TITLE")
-                itemid = str(feedentry.get("id"))
+            feedresult = my_rss.RssFetch.get_feed_entry(feedid)
+            if not feedresult:
+                bot.sendMessage(bot_chatId, "Keine neuen Nachrichten")
+            else:
+                for feedentry in feedresult:
+                    feedlink = feedentry["FEED_LINK"]
+                    print(type(feedlink))
+                    feedlink = feedentry.get("FEED_LINK")
+                    feedtitle = feedentry.get("FEED_TITLE")
+                    itemid = str(feedentry.get("id"))
 
-                markup = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text='Nein', callback_data='{"feedid": "' + feedid + '","itemid": "' + itemid + '", "feeback": "n" }'),
-                 InlineKeyboardButton(text='Ja', callback_data='{"feedid": "' + feedid + '","itemid": "' + itemid + '", "feeback": "y" }')],
-                [InlineKeyboardButton(text='RSS Feed wechseln', callback_data='rss')]
-                ])
-                bot.sendMessage(bot_chatId, feedtitle + "\n" + feedlink, reply_markup=markup)
+                    markup = InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text='Nein', callback_data='{"feedid": "' + feedid + '","itemid": "' + itemid + '", "feeback": "n" }'),
+                     InlineKeyboardButton(text='Ja', callback_data='{"feedid": "' + feedid + '","itemid": "' + itemid + '", "feeback": "y" }')],
+                    [InlineKeyboardButton(text='RSS Feed wechseln', callback_data='rss')]
+                    ])
+                    bot.sendMessage(bot_chatId, feedtitle + "\n" + feedlink, reply_markup=markup)
 
         elif query_data.get("feedid"):
             my_rss.RssFetch.set_feed_entry_vote(query_data['itemid'], query_data['feeback'])
-            print(query_data.get("feedid"))
+            myCommon.debug_log(query_data.get("feedid"))
             bot.answerCallbackQuery(query_id, text="Feedback gespeichert", show_alert=0)
             feedid = query_data['feedid']
             for feedentry in my_rss.RssFetch.get_feed_entry(feedid):
@@ -174,7 +186,6 @@ def main(argv=None):
                 [InlineKeyboardButton(text='RSS Feed wechseln', callback_data='rss')]
                 ])
                 bot.sendMessage(bot_chatId, feedtitle + "\n" + feedlink, reply_markup=markup)
-
         else:
             print("unklar")
             print(query_data.get("feed"))
