@@ -34,6 +34,7 @@ def generateQR(data):
 
 def main(argv=None):
     dhcpQueue = collections.deque(maxlen=10)
+    global markise_position
 
     def mqtt_on_log(client, userdata, level, buf):
         myCommon.debug_log("mqtt_log: ", buf)
@@ -54,8 +55,15 @@ def main(argv=None):
         client.disconnect_flag = True
 
     def mqtt_on_message(client, userdata, msg):
+        global markise_position
         mqtt_msg_json_obj = json.loads(msg.payload)
-        if msg.topic.startswith("dhcpd"):
+        myCommon.debug_log("new message for topic: " + msg.topic)
+        myCommon.debug_log(mqtt_msg_json_obj)
+        
+        if msg.topic.startswith("stat/tasmota-5FCFB2/RESULT"):
+            print("XXXX:" + str(mqtt_msg_json_obj['ShutterPosition1']))
+            markise_position = str(mqtt_msg_json_obj['ShutterPosition1'])
+        elif msg.topic.startswith("dhcpd"):
             deviceName = msg.topic.split('/')[1]
             try:
                 ipAddress = mqtt_msg_json_obj.get("ip-address")
@@ -66,6 +74,7 @@ def main(argv=None):
                     dhcpQueue.append(combinedValue)
                 myCommon.debug_log(deviceName)
             except:
+                myCommon.debug_log("Error")
                 raise
         elif msg.topic.startswith(gargentorCallback):
             toggleChannel = mqtt_msg_json_obj.get("channel")
@@ -74,17 +83,26 @@ def main(argv=None):
             myCommon.debug_log(mqtt_msg_json_obj)
         else:
             myCommon.debug_log("ignoring topic: ", msg.topic)
+        myCommon.debug_log("MQTT Message done")
 
     def on_chat_message(msg):
+        global markise_position
         content_type, chat_type, chat_id, chat_date, chat_msg_id = telepot.glance(msg, long=True)
         myCommon.debug_log(str(content_type)+ str(chat_type)+ str(chat_id))
 
         helptext = "Verfügbare Funktionen"
+        try:
+            markise_position
+        except NameError:
+            markise_position = -1
+
+        markise_text = 'Markise (' + str(markise_position) + ')'
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text='WiFi Password', callback_data='wifipass'),
              InlineKeyboardButton(text='DHCP History', callback_data='dhcphistory')],
-            [InlineKeyboardButton(text='Garage', callback_data='garagedoor')],
+            [InlineKeyboardButton(text='Garage', callback_data='garagedoor'),
+            InlineKeyboardButton(text=markise_text, callback_data='markise')],
             [InlineKeyboardButton(text='RSS Feeds', callback_data='rss')]
         ])
 
@@ -114,8 +132,13 @@ def main(argv=None):
 
     def on_callback_query(msg):
         query_id, from_id, query_data = telepot.glance(msg, flavor='callback_query')
+        print("orignal query_data" + query_data)
+        action = ""
         if query_data.startswith("{"):
             query_data = json.loads(query_data)
+            print("json detected: " + str(query_data))
+            if query_data.get("shutterposition"):
+                action = "shutterposition"
 
         if query_data == 'wifipass':
             qrwifi = "WIFI:T:WPA;S:"
@@ -133,6 +156,32 @@ def main(argv=None):
                 mySendMessage(item)
         elif query_data == 'garagedoor':
             ret = client.publish(gargentorTopic, '{"channel":' + gargentorChannel + ', "value": true, "time": 1000}')
+        elif query_data == 'markise':
+            possible_positions = []
+            possible_positions.append("0")
+            possible_positions.append("30")
+            possible_positions.append("70")
+            possible_positions.append("100")
+
+            feedkeyboard = []
+            for possibleshutterposition in possible_positions:
+                feedkeyboard.append(InlineKeyboardButton(text=possibleshutterposition, callback_data='{"shutterposition": "' + possibleshutterposition + '"}'))
+
+            feedkeyboard2 = []
+            feedkeyboard2.append(InlineKeyboardButton(text=str(int(markise_position)-10), callback_data='{"shutterposition": "' + str(int(markise_position)-10) + '"}'))
+            feedkeyboard2.append(InlineKeyboardButton(text=str(int(markise_position)+10), callback_data='{"shutterposition": "' + str(int(markise_position)+10) + '"}'))
+
+            inline_keyboard = []
+            inline_keyboard.append(feedkeyboard)
+            if int(markise_position) not in (-1,0,100):
+                inline_keyboard.append(feedkeyboard2)
+
+            markup = InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
+            bot.sendMessage(bot_chatId, "Wie weit soll die Markise raus??", reply_markup=markup)
+
+        elif action == "shutterposition":
+            ret = client.publish(markiseTopic, query_data.get("shutterposition"))
+            bot.answerCallbackQuery(query_id, text="Markise ist unterwegs", show_alert=0)
         elif query_data == 'rss':
             myCommon.debug_log("RSS FEEDS")
             markup = InlineKeyboardMarkup(inline_keyboard=[])
@@ -214,6 +263,8 @@ def main(argv=None):
     gargentorChannel = config.get("Tinkerforge", "gargentorChannel")
     garagenTorCallback = gargentorTopic.replace('request', 'callback')
     myCommon.debug_log(garagenTorCallback)
+
+    markiseTopic = config.get("Tinkerforge", "markiseTopic")
 
     global client
     client = mqtt.Client("homebot")
