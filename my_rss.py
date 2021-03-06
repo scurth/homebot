@@ -54,7 +54,7 @@ class RssFetch:
         mycursor.close()
 
     def get_feeds():
-        sql = 'select rss.rssid as rssid, rss.FEED_NAME as FEED_NAME, count(feeds.id) as COUNT from feeds join rss on (rss.rssid = feeds.rssid) where liked ="u" having COUNT>0'
+        sql = 'select rss.rssid as rssid, rss.FEED_NAME as FEED_NAME, count(feeds.id) as COUNT from feeds join rss on (rss.rssid = feeds.rssid) where liked ="u" group by rss.rssid having COUNT>0'
         mycursor = RssFetch.exec_sql(sql)
         result = mycursor.fetchall()
         mycursor.close()
