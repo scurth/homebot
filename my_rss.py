@@ -76,8 +76,9 @@ class RssFetch:
         for feed in rssfeeds:
             news_feed = feedparser.parse(feed)
             feedname = news_feed['feed']['title']
-            sql = 'insert ignore into `rss` (`FEED_NAME`) VALUES ("%s") ' % (feedname)
-            sql = sql + 'ON DUPLICATE KEY UPDATE rssid=LAST_INSERT_ID(`rssid`)'
+            feedlink = news_feed['feed']['link']
+            sql = 'insert ignore into `rss` (`FEED_NAME`, `FEED_LINK`) VALUES ("%s", "%s") ' % (feedname, feedlink)
+            sql = sql + 'ON DUPLICATE KEY UPDATE rssid=LAST_INSERT_ID(`rssid`), `FEED_LINK` = "%s"' % (feedlink)
             mycursor = RssFetch.exec_sql(sql)
             myCommon.debug_log(mycursor.lastrowid)
             feedid = mycursor.lastrowid
