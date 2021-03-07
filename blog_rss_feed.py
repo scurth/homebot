@@ -5,6 +5,7 @@ from feedgen.feed import FeedGenerator
 from dateutil.parser import parse
 import pytz
 import boto3
+import json
 
 import pymysql
 from myCommon import myCommon
@@ -50,6 +51,7 @@ class RssFetch:
 
     def get_feeds():
         sql = 'select id,FEED_TITLE, FEED_LINK, FEED_PUBLISHED, last_updated, description from feeds where liked = "y" order by last_updated DESC limit 50'
+        sql = 'select rss.FEED_NAME, id,FEED_TITLE, FEED_LINK, FEED_PUBLISHED, last_updated, description from feeds join rss on (rss.rssid=feeds.rssid) where liked = "y" order by last_updated DESC limit 50'
         mycursor = RssFetch.exec_sql(sql)
         result = mycursor.fetchall()
         return result
@@ -63,9 +65,12 @@ class RssFetch:
         fg.description('These news catched my attention.')
         for item in sorted(feeds, key=lambda k: k['FEED_PUBLISHED'], reverse = False):
             fe = fg.add_entry()
-            fe.id(item['FEED_LINK'])
+            fe.id(str(item['id']))
             fe.title(item['FEED_TITLE'])
             fe.link(href=item['FEED_LINK'], rel="alternate")
+            author = '{"name": "%s", "email":"source" }' % (item['FEED_NAME'])
+            author = json.loads(author)
+            fe.author(author)
             fe.pubDate(pytz.utc.localize(item['FEED_PUBLISHED']))
             fe.description(str(item['description']))
 
