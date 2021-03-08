@@ -113,6 +113,8 @@ def main(argv=None):
                 bot.sendMessage(chat_id, helptext, reply_markup=keyboard)
                 return
             elif command in ["help", "start"]:
+                entity = bot.getChat(chat_id)
+                helptext = "Hallo %s, diese Funktionen sind verfügbar" % (entity['first_name'])
                 bot.sendMessage(chat_id, helptext, reply_markup=keyboard)
                 return
             else:

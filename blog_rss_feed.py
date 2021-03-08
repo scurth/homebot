@@ -75,7 +75,6 @@ class RssFetch:
             fe.description(str(item['description']))
 
         sorted_fg = sorted(feeds, key=lambda k: k['FEED_PUBLISHED'], reverse = True)
-#        fg.rss_str()
         fg.rss_file('static/readers_digest_rss.xml') 
 
         s3 = boto3.resource('s3')
