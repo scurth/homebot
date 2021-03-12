@@ -85,6 +85,36 @@ def main(argv=None):
             myCommon.debug_log("ignoring topic: ", msg.topic)
         myCommon.debug_log("MQTT Message done")
 
+    def is_json(myjson):
+        try:
+          json_object = json.loads(myjson)
+        except ValueError as e:
+          return False
+        return True
+
+    def build_inline_keyboard(keyboard,text,callback_data):
+        if type(keyboard) != type([]):
+            myCommon.debug_log("keyboard is not a list, but " + str(type(keyboard)) + ". Resetting it to be an empty list")
+            inline_keyboard = []
+        else:
+            inline_keyboard = keyboard
+
+        myCommon.debug_log("callback_data:" + callback_data)
+        if not is_json(callback_data):
+            myCommon.debug_log("callback_data needs to be json")
+            return inline_keyboard
+
+        myCommon.debug_log("text:" + text)
+        if type(text) != type("string"):
+            myCommon.debug_log ("button text need to be from type string")
+            return inline_keyboard
+
+        print(len(inline_keyboard))
+        inline_keyboard.append(InlineKeyboardButton(text=text, callback_data=callback_data))
+        myCommon.debug_log("after" + str(inline_keyboard))
+
+        return inline_keyboard
+
     def on_chat_message(msg):
         global markise_position
         content_type, chat_type, chat_id, chat_date, chat_msg_id = telepot.glance(msg, long=True)
@@ -98,21 +128,24 @@ def main(argv=None):
 
         markise_text = 'Markise (' + str(markise_position) + ')'
 
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text='WiFi Password', callback_data='wifipass'),
-             InlineKeyboardButton(text='DHCP History', callback_data='dhcphistory')],
-            [InlineKeyboardButton(text='Garage', callback_data='garagedoor'),
-            InlineKeyboardButton(text=markise_text, callback_data='markise')],
-            [InlineKeyboardButton(text='RSS Feeds', callback_data='rss')]
-        ])
+        new_keyboard_line1 = []
+        new_keyboard_line1 = build_inline_keyboard(new_keyboard_line1,'WiFi Password','{"cb": "wifipass"}')
+        new_keyboard_line1 = build_inline_keyboard(new_keyboard_line1,'DHCP History','{"cb": "dhcphistory"}')
+
+        new_keyboard_line2 = []
+        new_keyboard_line2 = build_inline_keyboard(new_keyboard_line2,'Garage','{"cb": "garagedoor"}')
+        new_keyboard_line2 = build_inline_keyboard(new_keyboard_line2,markise_text,'{"cb": "markise"}')
+
+        new_keyboard_line3 = []
+        new_keyboard_line3 = build_inline_keyboard(new_keyboard_line3,'RSS Feeds','{"cb": "rss"}')
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[new_keyboard_line1, new_keyboard_line2, new_keyboard_line3])
+
 
         if content_type == 'text' and msg['text'][0] == "/":
             command = msg['text'].lower()[1:].split(" ", 1)[0]
             myCommon.debug_log("found :" + command + ":")
-            if content_type != 'text':
-                bot.sendMessage(chat_id, helptext, reply_markup=keyboard)
-                return
-            elif command in ["help", "start"]:
+            if command in ["help", "start"]:
                 entity = bot.getChat(chat_id)
                 helptext = "Hallo %s, diese Funktionen sind verfügbar" % (entity['first_name'])
                 bot.sendMessage(chat_id, helptext, reply_markup=keyboard)
@@ -136,13 +169,23 @@ def main(argv=None):
         query_id, from_id, query_data = telepot.glance(msg, flavor='callback_query')
         print("orignal query_data" + query_data)
         action = ""
-        if query_data.startswith("{"):
+        if not is_json(query_data):
+            myCommon.debug_log("query_data must be json")
+            return
+        else:
             query_data = json.loads(query_data)
-            print("json detected: " + str(query_data))
-            if query_data.get("shutterposition"):
-                action = "shutterposition"
 
-        if query_data == 'wifipass':
+        if not query_data.get("cb"):
+            myCommon.debug_log("query_data must be json and contain cb")
+            return
+
+#        if query_data.startswith("{"):
+#            query_data = json.loads(query_data)
+#            print("json detected: " + str(query_data))
+#            if query_data.get("shutterposition"):
+#                action = "shutterposition"
+
+        if query_data.get("cb") == "wifipass":
             qrwifi = "WIFI:T:WPA;S:"
             qrwifi = qrwifi + ssid + ";P:"
 
@@ -153,12 +196,12 @@ def main(argv=None):
             imgpath = generateQR(qrwifi)
             bot.sendPhoto(bot_chatId, photo=open(imgpath, 'rb'))
             bot.sendMessage(bot_chatId, passwd)
-        elif query_data == 'dhcphistory':
+        elif query_data.get("cb") == "dhcphistory":
             for item in dhcpQueue:
                 mySendMessage(item)
-        elif query_data == 'garagedoor':
+        elif query_data.get("cb") == "garagedoor":
             ret = client.publish(gargentorTopic, '{"channel":' + gargentorChannel + ', "value": true, "time": 1000}')
-        elif query_data == 'markise':
+        elif query_data.get("cb") == "markise":
             possible_positions = []
             possible_positions.append("0")
             possible_positions.append("30")
@@ -167,11 +210,11 @@ def main(argv=None):
 
             feedkeyboard = []
             for possibleshutterposition in possible_positions:
-                feedkeyboard.append(InlineKeyboardButton(text=possibleshutterposition, callback_data='{"shutterposition": "' + possibleshutterposition + '"}'))
+                feedkeyboard.append(InlineKeyboardButton(text=possibleshutterposition, callback_data='{"cb":"shutterposition", "target": "' + possibleshutterposition + '"}'))
 
             feedkeyboard2 = []
-            feedkeyboard2.append(InlineKeyboardButton(text=str(int(markise_position)-10), callback_data='{"shutterposition": "' + str(int(markise_position)-10) + '"}'))
-            feedkeyboard2.append(InlineKeyboardButton(text=str(int(markise_position)+10), callback_data='{"shutterposition": "' + str(int(markise_position)+10) + '"}'))
+            feedkeyboard2.append(InlineKeyboardButton(text=str(int(markise_position)-10), callback_data='{"cb": "shutterposition", "target": "' + str(int(markise_position)-10) + '"}'))
+            feedkeyboard2.append(InlineKeyboardButton(text=str(int(markise_position)+10), callback_data='{"cb": "shutterposition", "target": "' + str(int(markise_position)+10) + '"}'))
 
             inline_keyboard = []
             inline_keyboard.append(feedkeyboard)
@@ -181,10 +224,10 @@ def main(argv=None):
             markup = InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
             bot.sendMessage(bot_chatId, "Wie weit soll die Markise raus??", reply_markup=markup)
 
-        elif action == "shutterposition":
-            ret = client.publish(markiseTopic, query_data.get("shutterposition"))
+        elif query_data.get("cb") == "shutterposition":
+            ret = client.publish(markiseTopic, query_data.get("target"))
             bot.answerCallbackQuery(query_id, text="Markise ist unterwegs", show_alert=0)
-        elif query_data == 'rss':
+        elif query_data.get("cb") == "rss":
             myCommon.debug_log("RSS FEEDS")
             markup = InlineKeyboardMarkup(inline_keyboard=[])
             feedkeyboard = []
@@ -193,53 +236,37 @@ def main(argv=None):
             if feednames:
                 for feed in feednames:
                     buttontext = feed['FEED_NAME'] + " (" + str(feed['COUNT']) + ")"
-                    feedkeyboard.append(InlineKeyboardButton(text=buttontext, callback_data='{"feed": "' + str(feed['rssid']) + '"}'))
+                    feedkeyboard.append(InlineKeyboardButton(text=buttontext, callback_data='{"cb": "feedid", "fid": "' + str(feed['rssid']) + '"}'))
                 markup = InlineKeyboardMarkup(inline_keyboard=[feedkeyboard])
                 bot.sendMessage(bot_chatId, "Welchen Feed?", reply_markup=markup)
             else:
                 bot.sendMessage(bot_chatId, "Keine neuen Nachrichten")
 
-        elif query_data.get("feed"):
-            feedid = query_data['feed']
-            print(feedid)
+        elif query_data.get("cb") == "feedid":
+            feedid = query_data['fid']
+            if query_data.get('fb') and query_data.get('itemid'):
+                my_rss.RssFetch.set_feed_entry_vote(query_data['itemid'], query_data['fb'])
+                myCommon.debug_log(feedid)
+                bot.answerCallbackQuery(query_id, text="Feedback gespeichert", show_alert=0)
 
-            feedresult = my_rss.RssFetch.get_feed_entry(feedid)
-            if not feedresult:
-                bot.sendMessage(bot_chatId, "Keine neuen Nachrichten")
-            else:
-                for feedentry in feedresult:
-                    feedlink = feedentry["FEED_LINK"]
-                    print(type(feedlink))
-                    feedlink = feedentry.get("FEED_LINK")
-                    feedtitle = feedentry.get("FEED_TITLE")
-                    itemid = str(feedentry.get("id"))
-
-                    markup = InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text='Nein', callback_data='{"feedid": "' + feedid + '","itemid": "' + itemid + '", "feeback": "n" }'),
-                     InlineKeyboardButton(text='Ja', callback_data='{"feedid": "' + feedid + '","itemid": "' + itemid + '", "feeback": "y" }')],
-                    [InlineKeyboardButton(text='RSS Feed wechseln', callback_data='rss')]
-                    ])
-                    bot.sendMessage(bot_chatId, feedtitle + "\n" + feedlink, reply_markup=markup)
-
-        elif query_data.get("feedid"):
-            my_rss.RssFetch.set_feed_entry_vote(query_data['itemid'], query_data['feeback'])
-            myCommon.debug_log(query_data.get("feedid"))
-            bot.answerCallbackQuery(query_id, text="Feedback gespeichert", show_alert=0)
-            feedid = query_data['feedid']
+            myCommon.debug_log("Requesting feeds from feedid: " + feedid)
             for feedentry in my_rss.RssFetch.get_feed_entry(feedid):
                 feedlink = feedentry.get("FEED_LINK")
                 feedtitle = feedentry.get("FEED_TITLE")
                 itemid = str(feedentry.get("id"))
 
+                callback_no = '{"cb": "feedid", "fid": "' + feedid + '", "itemid": "' + itemid + '", "fb": "n" }'
+                callback_yes = '{"cb": "feedid", "fid": "' + feedid + '", "itemid": "' + itemid + '", "fb": "y" }'
+
                 markup = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text='Nein', callback_data='{"feedid": "' + feedid + '","itemid": "' + itemid + '", "feeback": "n" }'),
-                 InlineKeyboardButton(text='Ja', callback_data='{"feedid": "' + feedid + '","itemid": "' + itemid + '", "feeback": "y" }')],
-                [InlineKeyboardButton(text='RSS Feed wechseln', callback_data='rss')]
+                [InlineKeyboardButton(text='Nein', callback_data=callback_no),
+                 InlineKeyboardButton(text='Ja', callback_data=callback_yes)],
+                [InlineKeyboardButton(text='RSS Feed wechseln', callback_data='{"cb": "rss"}')]
                 ])
                 bot.sendMessage(bot_chatId, feedtitle + "\n" + feedlink, reply_markup=markup)
         else:
             print("unklar")
-            print(query_data.get("feed"))
+            print(query_data)
 
         bot.answerCallbackQuery(query_id, text="Fertig", show_alert=0)
 

@@ -1,0 +1,8 @@
+
+if 64 byte limit becomes a problem on callback data:
+refactor json to be compressed
+                    print(callback_yes)
+                    print(len(callback_yes))
+                    json_bytes = bytes(callback_yes,'utf-8')
+                    gztest = gzip.zlib.compress(json_bytes,-1)
+                    print(len(gztest))
