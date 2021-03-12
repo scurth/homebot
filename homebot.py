@@ -45,9 +45,16 @@ def main(argv=None):
             client.connected_flag = True
             myCommon.debug_log("MQTT connected OK Returned code:" + str(resultCode))
             for topic in mqttTopics:
+                print("subscribe to topic:" + topic)
                 client.subscribe(topic + '/#')
         else:
             myCommon.debug_log("Bad connection Returned code= ", resultCode)
+
+        for topic in InitMqttTopics:
+            ret = client.publish(topic, "0")
+            print(ret)
+
+        client.publish("cmnd/tasmota-5FCFB2/Status", "1")
 
     def mqtt_on_disconnect(client, userdata, resultCode):
         myCommon.debug_log("disconnecting reason  "  +str(resultCode))
@@ -61,8 +68,15 @@ def main(argv=None):
         myCommon.debug_log(mqtt_msg_json_obj)
         
         if msg.topic.startswith("stat/tasmota-5FCFB2/RESULT"):
-            print("XXXX:" + str(mqtt_msg_json_obj['ShutterPosition1']))
             markise_position = str(mqtt_msg_json_obj['ShutterPosition1'])
+            print(markise_position)
+            editable = mySendMessage("Markise auf Position:" + str(markise_position))
+#            bot.editMessageText(editable, "Markise auf Position:" + str(markise_position))
+
+        elif msg.topic.startswith("tele/tasmota-5FCFB2/SENSOR"):
+            markise_position = str(mqtt_msg_json_obj['Shutter1']['Position'])
+        elif msg.topic.startswith("stat/tasmota-5FCFB2/STATUS10"):
+            markise_position = str(mqtt_msg_json_obj['StatusSNS']['Shutter1']['Position'])
         elif msg.topic.startswith("dhcpd"):
             deviceName = msg.topic.split('/')[1]
             try:
@@ -174,16 +188,8 @@ def main(argv=None):
             return
         else:
             query_data = json.loads(query_data)
-
-        if not query_data.get("cb"):
-            myCommon.debug_log("query_data must be json and contain cb")
-            return
-
-#        if query_data.startswith("{"):
-#            query_data = json.loads(query_data)
-#            print("json detected: " + str(query_data))
-#            if query_data.get("shutterposition"):
-#                action = "shutterposition"
+            if  not query_data.get("cb"):
+                myCommon.debug_log("query_data must be json and contain cb")
 
         if query_data.get("cb") == "wifipass":
             qrwifi = "WIFI:T:WPA;S:"
@@ -196,6 +202,7 @@ def main(argv=None):
             imgpath = generateQR(qrwifi)
             bot.sendPhoto(bot_chatId, photo=open(imgpath, 'rb'))
             bot.sendMessage(bot_chatId, passwd)
+
         elif query_data.get("cb") == "dhcphistory":
             for item in dhcpQueue:
                 mySendMessage(item)
@@ -204,22 +211,23 @@ def main(argv=None):
         elif query_data.get("cb") == "markise":
             possible_positions = []
             possible_positions.append("0")
-            possible_positions.append("30")
-            possible_positions.append("70")
+            possible_positions.append("40")
+            possible_positions.append("80")
             possible_positions.append("100")
 
-            feedkeyboard = []
+            new_keyboard_line1 = []
             for possibleshutterposition in possible_positions:
-                feedkeyboard.append(InlineKeyboardButton(text=possibleshutterposition, callback_data='{"cb":"shutterposition", "target": "' + possibleshutterposition + '"}'))
+                if possibleshutterposition != markise_position:
+                    new_keyboard_line1 = build_inline_keyboard(new_keyboard_line1,possibleshutterposition,'{"cb":"shutterposition", "target": "' + possibleshutterposition + '"}')
 
-            feedkeyboard2 = []
-            feedkeyboard2.append(InlineKeyboardButton(text=str(int(markise_position)-10), callback_data='{"cb": "shutterposition", "target": "' + str(int(markise_position)-10) + '"}'))
-            feedkeyboard2.append(InlineKeyboardButton(text=str(int(markise_position)+10), callback_data='{"cb": "shutterposition", "target": "' + str(int(markise_position)+10) + '"}'))
+            new_keyboard_line2 = []
+            new_keyboard_line2 = build_inline_keyboard(new_keyboard_line2,possibleshutterposition,'{"cb":"shutterposition", "target": "' + str(int(markise_position)-10) + '"}')
+            new_keyboard_line2 = build_inline_keyboard(new_keyboard_line2,possibleshutterposition,'{"cb":"shutterposition", "target": "' + str(int(markise_position)+10) + '"}')
 
             inline_keyboard = []
-            inline_keyboard.append(feedkeyboard)
+            inline_keyboard.append(new_keyboard_line1)
             if int(markise_position) not in (-1,0,100):
-                inline_keyboard.append(feedkeyboard2)
+                inline_keyboard.append(new_keyboard_line2)
 
             markup = InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
             bot.sendMessage(bot_chatId, "Wie weit soll die Markise raus??", reply_markup=markup)
@@ -287,6 +295,7 @@ def main(argv=None):
     ssid = config.get("WifiSettings", "ssid")
 
     mqttTopics = config.get("MqttSubscribe", "MqttTopics").replace(' ', '').split(',')
+    InitMqttTopics = config.get("MqttSubscribe", "InitMqttSubscribe").replace(' ', '').split(',')
 
     gargentorTopic = config.get("Tinkerforge", "gargentorTopic")
     gargentorChannel = config.get("Tinkerforge", "gargentorChannel")
