@@ -66,7 +66,7 @@ def main(argv=None):
         mqtt_msg_json_obj = json.loads(msg.payload)
         myCommon.debug_log("new message for topic: " + msg.topic)
         myCommon.debug_log(mqtt_msg_json_obj)
-       
+
         if msg.topic.startswith("stat/tasmota-5FCFB2/RESULT"):
             global lastMarkiseMsg
             markise_position = str(mqtt_msg_json_obj['Shutter1']['Position'])
@@ -74,7 +74,7 @@ def main(argv=None):
             try:
                 lastMarkiseMsg
             except NameError:
-                lastMarkiseMsg = (0,0)
+                lastMarkiseMsg = (0, 0)
             else:
                 myCommon.debug_log("lastMarkiseMsg is defined.")
 
@@ -83,7 +83,7 @@ def main(argv=None):
             # Stop button
             # am ende das keyboard mit den auswahl
             if mqtt_msg_json_obj['Shutter1']['Position'] == mqtt_msg_json_obj['Shutter1']['Target']:
-                lastMarkiseMsg = (0,0)
+                lastMarkiseMsg = (0, 0)
                 print("Fertig")
 
         # SENSOR comes in every 10 secs or so
@@ -118,12 +118,12 @@ def main(argv=None):
 
     def is_json(myjson):
         try:
-          json_object = json.loads(myjson)
+            json_object = json.loads(myjson)
         except ValueError as e:
-          return False
+            return False
         return True
 
-    def build_inline_keyboard(keyboard,text,callback_data):
+    def build_inline_keyboard(keyboard, text, callback_data):
         if type(keyboard) != type([]):
             myCommon.debug_log("keyboard is not a list, but " + str(type(keyboard)) + ". Resetting it to be an empty list")
             inline_keyboard = []
@@ -135,7 +135,7 @@ def main(argv=None):
             return inline_keyboard
 
         if type(text) != type("string"):
-            myCommon.debug_log ("button text need to be from type string")
+            myCommon.debug_log("button text need to be from type string")
             return inline_keyboard
 
         inline_keyboard.append(InlineKeyboardButton(text=text, callback_data=callback_data))
@@ -156,15 +156,15 @@ def main(argv=None):
         markise_text = 'Markise (' + str(markise_position) + ')'
 
         new_keyboard_line1 = []
-        new_keyboard_line1 = build_inline_keyboard(new_keyboard_line1,'WiFi Password','{"cb": "wifipass"}')
-        new_keyboard_line1 = build_inline_keyboard(new_keyboard_line1,'DHCP History','{"cb": "dhcphistory"}')
+        new_keyboard_line1 = build_inline_keyboard(new_keyboard_line1, 'WiFi Password', '{"cb": "wifipass"}')
+        new_keyboard_line1 = build_inline_keyboard(new_keyboard_line1, 'DHCP History', '{"cb": "dhcphistory"}')
 
         new_keyboard_line2 = []
-        new_keyboard_line2 = build_inline_keyboard(new_keyboard_line2,'Garage','{"cb": "garagedoor"}')
-        new_keyboard_line2 = build_inline_keyboard(new_keyboard_line2,markise_text,'{"cb": "markise"}')
+        new_keyboard_line2 = build_inline_keyboard(new_keyboard_line2, 'Garage', '{"cb": "garagedoor"}')
+        new_keyboard_line2 = build_inline_keyboard(new_keyboard_line2, markise_text, '{"cb": "markise"}')
 
         new_keyboard_line3 = []
-        new_keyboard_line3 = build_inline_keyboard(new_keyboard_line3,'RSS Feeds','{"cb": "rss"}')
+        new_keyboard_line3 = build_inline_keyboard(new_keyboard_line3, 'RSS Feeds', '{"cb": "rss"}')
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[new_keyboard_line1, new_keyboard_line2, new_keyboard_line3])
 
@@ -202,7 +202,7 @@ def main(argv=None):
             if  not query_data.get("cb"):
                 myCommon.debug_log("query_data must be json and contain cb")
         global lastMarkiseMsg
-        lastMarkiseMsg = (0,0)
+        lastMarkiseMsg = (0, 0)
         if query_data.get("cb") == "wifipass":
             qrwifi = "WIFI:T:WPA;S:"
             qrwifi = qrwifi + ssid + ";P:"
@@ -228,16 +228,16 @@ def main(argv=None):
             new_keyboard_line2 = []
             for adjustment in -10, 10:
                 new_value = int(markise_position) + adjustment
-                allowed_range = range(0,100)
+                allowed_range = range(0, 100)
                 if new_value in allowed_range:
-                    new_keyboard_line2 = build_inline_keyboard(new_keyboard_line2,str(new_value),'{"cb":"shutterposition", "target": "' + str(new_value) + '"}')
+                    new_keyboard_line2 = build_inline_keyboard(new_keyboard_line2, str(new_value), '{"cb":"shutterposition", "target": "' + str(new_value) + '"}')
                     if new_value in possible_positions:
                         possible_positions.remove(new_value)
 
             new_keyboard_line1 = []
             for possibleshutterposition in possible_positions:
                 if possibleshutterposition != markise_position:
-                    new_keyboard_line1 = build_inline_keyboard(new_keyboard_line1,str(possibleshutterposition),'{"cb":"shutterposition", "target": "' + str(possibleshutterposition) + '"}')
+                    new_keyboard_line1 = build_inline_keyboard(new_keyboard_line1, str(possibleshutterposition), '{"cb":"shutterposition", "target": "' + str(possibleshutterposition) + '"}')
 
             markup = InlineKeyboardMarkup(inline_keyboard=[new_keyboard_line1, new_keyboard_line2])
             bot.sendMessage(bot_chatId, "Wie weit soll die Markise raus??", reply_markup=markup)
@@ -276,10 +276,10 @@ def main(argv=None):
                 callback_yes = '{"cb": "feedid", "fid": "' + feedid + '", "itemid": "' + itemid + '", "fb": "y" }'
 
                 markup = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text='Nein', callback_data=callback_no),
-                 InlineKeyboardButton(text='Ja', callback_data=callback_yes)],
-                [InlineKeyboardButton(text='RSS Feed wechseln', callback_data='{"cb": "rss"}')]
-                ])
+                    [InlineKeyboardButton(text='Nein', callback_data=callback_no),
+                     InlineKeyboardButton(text='Ja', callback_data=callback_yes)],
+                    [InlineKeyboardButton(text='RSS Feed wechseln', callback_data='{"cb": "rss"}')]
+                    ])
                 bot.sendMessage(bot_chatId, feedtitle + "\n" + feedlink, reply_markup=markup)
         else:
             print("unklar")
@@ -287,12 +287,12 @@ def main(argv=None):
 
         bot.answerCallbackQuery(query_id, text="Fertig", show_alert=0)
 
-    def mySendMessage(msg, parse_mode="HTML", disable_web_page_preview=False, edit=(0,0)):
+    def mySendMessage(msg, parse_mode="HTML", disable_web_page_preview=False, edit=(0, 0)):
         global editable
         try:
             myCommon.debug_log("bot_chatId: " + str(bot_chatId) + " message: " + str(msg))
             myCommon.debug_log("parse_mode: " + str(parse_mode) + " disable_web_page_preview: " + str(disable_web_page_preview))
-            if edit != (0,0):
+            if edit != (0, 0):
                 editable = bot.editMessageText(editable, str(msg))
             else:
                 try:
