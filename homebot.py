@@ -17,23 +17,23 @@ import my_rss
 
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
-def generateQR(data):
-    qr = qrcode.QRCode(
+def generate_qr(data):
+    qr_obj = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_L,
         box_size=10,
         border=4,
     )
-    qr.add_data(data)
-    qr.make(fit=True)
+    qr_obj.add_data(data)
+    qr_obj.make(fit=True)
 
-    img = qr.make_image(fill_color="black", back_color="white")
+    img = qr_obj.make_image(fill_color="black", back_color="white")
     img.save("img1.png", "PNG")
 
     return "img1.png"
 
 def main(argv=None):
-    dhcpQueue = collections.deque(maxlen=10)
+    dhcp_queue = collections.deque(maxlen=10)
     global markise_position
 
     def mqtt_on_log(client, userdata, level, buf):
@@ -44,13 +44,13 @@ def main(argv=None):
         if resultCode == 0:
             client.connected_flag = True
             myCommon.debug_log("MQTT connected OK Returned code:" + str(resultCode))
-            for topic in mqttTopics:
+            for topic in mqtt_topics:
                 myCommon.debug_log("subscribe to topic:" + topic)
                 client.subscribe(topic + '/#')
         else:
             myCommon.debug_log("Bad connection Returned code= ", resultCode)
 
-        for topic in InitMqttTopics:
+        for topic in init_mqtt_topics:
             ret = client.publish(topic, "0")
             myCommon.debug_log(ret)
 
@@ -78,7 +78,7 @@ def main(argv=None):
             else:
                 myCommon.debug_log("lastMarkiseMsg is defined.")
 
-            lastMarkiseMsg = mySendMessage("Markise auf Position:" + str(markise_position), "HTML", False, lastMarkiseMsg)
+            lastMarkiseMsg = my_send_message("Markise auf Position:" + str(markise_position), "HTML", False, lastMarkiseMsg)
             myCommon.debug_log(lastMarkiseMsg)
             # Stop button
             # am ende das keyboard mit den auswahl
@@ -95,22 +95,22 @@ def main(argv=None):
             markise_position = str(mqtt_msg_json_obj['StatusSNS']['Shutter1']['Position'])
 
         elif msg.topic.startswith("dhcpd"):
-            deviceName = msg.topic.split('/')[1]
+            device_name = msg.topic.split('/')[1]
             try:
-                ipAddress = mqtt_msg_json_obj.get("ip-address")
-                deviceName = mqtt_msg_json_obj.get("device-name")
-                macAdress = mqtt_msg_json_obj.get("mac-adress")
-                combinedValue = macAdress + " " + ipAddress + " " + deviceName
-                if combinedValue not in dhcpQueue:
-                    dhcpQueue.append(combinedValue)
-                myCommon.debug_log(deviceName)
+                ip_adress = mqtt_msg_json_obj.get("ip-address")
+                device_name = mqtt_msg_json_obj.get("device-name")
+                mac_adress = mqtt_msg_json_obj.get("mac-adress")
+                combined_value = mac_adress + " " + ip_adress + " " + device_name
+                if combined_value not in dhcp_queue:
+                    dhcp_queue.append(combined_value)
+                myCommon.debug_log(device_name)
             except:
                 myCommon.debug_log("Error")
                 raise
-        elif msg.topic.startswith(gargentorCallback):
-            toggleChannel = mqtt_msg_json_obj.get("channel")
-            if int(toggleChannel) == int(gargentorChannel):
-                mySendMessage("Gargentor geschaltet")
+        elif msg.topic.startswith(gargentor_callback):
+            toggle_channel = mqtt_msg_json_obj.get("channel")
+            if int(toggle_channel) == int(gargentor_channel):
+                my_send_message("Gargentor geschaltet")
             myCommon.debug_log(mqtt_msg_json_obj)
         else:
             myCommon.debug_log("ignoring topic: ", msg.topic)
@@ -124,7 +124,7 @@ def main(argv=None):
         return True
 
     def build_inline_keyboard(keyboard, text, callback_data):
-        if type(keyboard) != type([]):
+        if not isinstance(keyboard, list):
             myCommon.debug_log("keyboard is not a list, but " + str(type(keyboard)) + ". Resetting it to be an empty list")
             inline_keyboard = []
         else:
@@ -134,7 +134,7 @@ def main(argv=None):
             myCommon.debug_log("callback_data needs to be json")
             return inline_keyboard
 
-        if type(text) != type("string"):
+        if not isinstance(text, str):
             myCommon.debug_log("button text need to be from type string")
             return inline_keyboard
 
@@ -211,15 +211,15 @@ def main(argv=None):
                 if re.search("00:00:00:00:00:00", line):
                     passwd = line.split(" ")[1].replace('\n', '').replace('\r', '')
                     qrwifi = qrwifi + passwd.replace('$', '\$').replace(';', '\;') + ";;"
-            imgpath = generateQR(qrwifi)
+            imgpath = generate_qr(qrwifi)
             bot.sendPhoto(bot_chatId, photo=open(imgpath, 'rb'))
             bot.sendMessage(bot_chatId, passwd)
 
         elif query_data.get("cb") == "dhcphistory":
-            for item in dhcpQueue:
-                mySendMessage(item)
+            for item in dhcp_queue:
+                my_send_message(item)
         elif query_data.get("cb") == "garagedoor":
-            ret = client.publish(gargentorTopic, '{"channel":' + gargentorChannel + ', "value": true, "time": 1000}')
+            ret = client.publish(gargentor_topic, '{"channel":' + gargentor_channel + ', "value": true, "time": 1000}')
         elif query_data.get("cb") == "markise":
             possible_positions = []
             for fixed_position in 0, 40, 80, 100:
@@ -243,7 +243,7 @@ def main(argv=None):
             bot.sendMessage(bot_chatId, "Wie weit soll die Markise raus??", reply_markup=markup)
 
         elif query_data.get("cb") == "shutterposition":
-            ret = client.publish(markiseTopic, query_data.get("target"))
+            ret = client.publish(markise_topic, query_data.get("target"))
             bot.answerCallbackQuery(query_id, text="Markise ist unterwegs", show_alert=0)
         elif query_data.get("cb") == "rss":
             myCommon.debug_log("RSS FEEDS")
@@ -287,7 +287,7 @@ def main(argv=None):
 
         bot.answerCallbackQuery(query_id, text="Fertig", show_alert=0)
 
-    def mySendMessage(msg, parse_mode="HTML", disable_web_page_preview=False, edit=(0, 0)):
+    def my_send_message(msg, parse_mode="HTML", disable_web_page_preview=False, edit=(0, 0)):
         global editable
         try:
             myCommon.debug_log("bot_chatId: " + str(bot_chatId) + " message: " + str(msg))
@@ -312,15 +312,14 @@ def main(argv=None):
     psk_file = config.get("WifiSettings", "pskfile")
     ssid = config.get("WifiSettings", "ssid")
 
-    mqttTopics = config.get("MqttSubscribe", "MqttTopics").replace(' ', '').split(',')
-    InitMqttTopics = config.get("MqttSubscribe", "InitMqttSubscribe").replace(' ', '').split(',')
+    mqtt_topics = config.get("MqttSubscribe", "MqttTopics").replace(' ', '').split(',')
+    init_mqtt_topics = config.get("MqttSubscribe", "InitMqttSubscribe").replace(' ', '').split(',')
 
-    gargentorTopic = config.get("Tinkerforge", "gargentorTopic")
-    gargentorChannel = config.get("Tinkerforge", "gargentorChannel")
-    garagenTorCallback = gargentorTopic.replace('request', 'callback')
-    myCommon.debug_log(garagenTorCallback)
+    gargentor_topic = config.get("Tinkerforge", "gargentorTopic")
+    gargentor_channel = config.get("Tinkerforge", "gargentorChannel")
+    gargentor_callback = gargentor_topic.replace('request', 'callback')
 
-    markiseTopic = config.get("Tinkerforge", "markiseTopic")
+    markise_topic = config.get("Tinkerforge", "markiseTopic")
 
     global client
     client = mqtt.Client("homebot")
