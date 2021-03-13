@@ -45,14 +45,14 @@ def main(argv=None):
             client.connected_flag = True
             myCommon.debug_log("MQTT connected OK Returned code:" + str(resultCode))
             for topic in mqttTopics:
-                print("subscribe to topic:" + topic)
+                myCommon.debug_log("subscribe to topic:" + topic)
                 client.subscribe(topic + '/#')
         else:
             myCommon.debug_log("Bad connection Returned code= ", resultCode)
 
         for topic in InitMqttTopics:
             ret = client.publish(topic, "0")
-            print(ret)
+            myCommon.debug_log(ret)
 
         client.publish("cmnd/tasmota-5FCFB2/Status", "1")
 
@@ -66,17 +66,34 @@ def main(argv=None):
         mqtt_msg_json_obj = json.loads(msg.payload)
         myCommon.debug_log("new message for topic: " + msg.topic)
         myCommon.debug_log(mqtt_msg_json_obj)
-        
+       
         if msg.topic.startswith("stat/tasmota-5FCFB2/RESULT"):
-            markise_position = str(mqtt_msg_json_obj['ShutterPosition1'])
-            print(markise_position)
-            editable = mySendMessage("Markise auf Position:" + str(markise_position))
-#            bot.editMessageText(editable, "Markise auf Position:" + str(markise_position))
+            global lastMarkiseMsg
+            markise_position = str(mqtt_msg_json_obj['Shutter1']['Position'])
+            myCommon.debug_log("Pos: " + str(markise_position))
+            try:
+                lastMarkiseMsg
+            except NameError:
+                lastMarkiseMsg = (0,0)
+            else:
+                myCommon.debug_log("lastMarkiseMsg is defined.")
 
+            lastMarkiseMsg = mySendMessage("Markise auf Position:" + str(markise_position), "HTML", False, lastMarkiseMsg)
+            myCommon.debug_log(lastMarkiseMsg)
+            # Stop button
+            # am ende das keyboard mit den auswahl
+            if mqtt_msg_json_obj['Shutter1']['Position'] == mqtt_msg_json_obj['Shutter1']['Target']:
+                lastMarkiseMsg = (0,0)
+                print("Fertig")
+
+        # SENSOR comes in every 10 secs or so
         elif msg.topic.startswith("tele/tasmota-5FCFB2/SENSOR"):
             markise_position = str(mqtt_msg_json_obj['Shutter1']['Position'])
+
+        # this is actively triggers by cmd/+/status
         elif msg.topic.startswith("stat/tasmota-5FCFB2/STATUS10"):
             markise_position = str(mqtt_msg_json_obj['StatusSNS']['Shutter1']['Position'])
+
         elif msg.topic.startswith("dhcpd"):
             deviceName = msg.topic.split('/')[1]
             try:
@@ -113,19 +130,15 @@ def main(argv=None):
         else:
             inline_keyboard = keyboard
 
-        myCommon.debug_log("callback_data:" + callback_data)
         if not is_json(callback_data):
             myCommon.debug_log("callback_data needs to be json")
             return inline_keyboard
 
-        myCommon.debug_log("text:" + text)
         if type(text) != type("string"):
             myCommon.debug_log ("button text need to be from type string")
             return inline_keyboard
 
-        print(len(inline_keyboard))
         inline_keyboard.append(InlineKeyboardButton(text=text, callback_data=callback_data))
-        myCommon.debug_log("after" + str(inline_keyboard))
 
         return inline_keyboard
 
@@ -181,8 +194,6 @@ def main(argv=None):
 
     def on_callback_query(msg):
         query_id, from_id, query_data = telepot.glance(msg, flavor='callback_query')
-        print("orignal query_data" + query_data)
-        action = ""
         if not is_json(query_data):
             myCommon.debug_log("query_data must be json")
             return
@@ -190,7 +201,8 @@ def main(argv=None):
             query_data = json.loads(query_data)
             if  not query_data.get("cb"):
                 myCommon.debug_log("query_data must be json and contain cb")
-
+        global lastMarkiseMsg
+        lastMarkiseMsg = (0,0)
         if query_data.get("cb") == "wifipass":
             qrwifi = "WIFI:T:WPA;S:"
             qrwifi = qrwifi + ssid + ";P:"
@@ -210,26 +222,24 @@ def main(argv=None):
             ret = client.publish(gargentorTopic, '{"channel":' + gargentorChannel + ', "value": true, "time": 1000}')
         elif query_data.get("cb") == "markise":
             possible_positions = []
-            possible_positions.append("0")
-            possible_positions.append("40")
-            possible_positions.append("80")
-            possible_positions.append("100")
+            for fixed_position in 0, 40, 80, 100:
+                possible_positions.append(fixed_position)
+
+            new_keyboard_line2 = []
+            for adjustment in -10, 10:
+                new_value = int(markise_position) + adjustment
+                allowed_range = range(0,100)
+                if new_value in allowed_range:
+                    new_keyboard_line2 = build_inline_keyboard(new_keyboard_line2,str(new_value),'{"cb":"shutterposition", "target": "' + str(new_value) + '"}')
+                    if new_value in possible_positions:
+                        possible_positions.remove(new_value)
 
             new_keyboard_line1 = []
             for possibleshutterposition in possible_positions:
                 if possibleshutterposition != markise_position:
-                    new_keyboard_line1 = build_inline_keyboard(new_keyboard_line1,possibleshutterposition,'{"cb":"shutterposition", "target": "' + possibleshutterposition + '"}')
+                    new_keyboard_line1 = build_inline_keyboard(new_keyboard_line1,str(possibleshutterposition),'{"cb":"shutterposition", "target": "' + str(possibleshutterposition) + '"}')
 
-            new_keyboard_line2 = []
-            new_keyboard_line2 = build_inline_keyboard(new_keyboard_line2,possibleshutterposition,'{"cb":"shutterposition", "target": "' + str(int(markise_position)-10) + '"}')
-            new_keyboard_line2 = build_inline_keyboard(new_keyboard_line2,possibleshutterposition,'{"cb":"shutterposition", "target": "' + str(int(markise_position)+10) + '"}')
-
-            inline_keyboard = []
-            inline_keyboard.append(new_keyboard_line1)
-            if int(markise_position) not in (-1,0,100):
-                inline_keyboard.append(new_keyboard_line2)
-
-            markup = InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
+            markup = InlineKeyboardMarkup(inline_keyboard=[new_keyboard_line1, new_keyboard_line2])
             bot.sendMessage(bot_chatId, "Wie weit soll die Markise raus??", reply_markup=markup)
 
         elif query_data.get("cb") == "shutterposition":
@@ -240,7 +250,6 @@ def main(argv=None):
             markup = InlineKeyboardMarkup(inline_keyboard=[])
             feedkeyboard = []
             feednames = my_rss.RssFetch.get_feeds()
-            print(feednames)
             if feednames:
                 for feed in feednames:
                     buttontext = feed['FEED_NAME'] + " (" + str(feed['COUNT']) + ")"
@@ -278,10 +287,19 @@ def main(argv=None):
 
         bot.answerCallbackQuery(query_id, text="Fertig", show_alert=0)
 
-    def mySendMessage(msg, parse_mode="HTML", disable_web_page_preview=False):
+    def mySendMessage(msg, parse_mode="HTML", disable_web_page_preview=False, edit=(0,0)):
+        global editable
         try:
             myCommon.debug_log("bot_chatId: " + str(bot_chatId) + " message: " + str(msg))
-            editable = bot.sendMessage(bot_chatId, str(msg), parse_mode=parse_mode, disable_web_page_preview=disable_web_page_preview)
+            myCommon.debug_log("parse_mode: " + str(parse_mode) + " disable_web_page_preview: " + str(disable_web_page_preview))
+            if edit != (0,0):
+                editable = bot.editMessageText(editable, str(msg))
+            else:
+                try:
+                    editable = bot.sendMessage(bot_chatId, str(msg), parse_mode=parse_mode, disable_web_page_preview=disable_web_page_preview)
+                except:
+                    myCommon.debug_log("bot sendMessage error")
+
             time.sleep(0.01)
             editable = telepot.message_identifier(editable)
             return editable
