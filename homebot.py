@@ -239,11 +239,17 @@ def main(argv=None):
                 if possibleshutterposition != markise_position:
                     new_keyboard_line1 = build_inline_keyboard(new_keyboard_line1, str(possibleshutterposition), '{"cb":"shutterposition", "target": "' + str(possibleshutterposition) + '"}')
 
-            markup = InlineKeyboardMarkup(inline_keyboard=[new_keyboard_line1, new_keyboard_line2])
+            new_keyboard_line3 = []
+            new_keyboard_line3 = build_inline_keyboard(new_keyboard_line3, "Stop", '{"cb":"shutterstop", "message": "1"}')
+
+            markup = InlineKeyboardMarkup(inline_keyboard=[new_keyboard_line1, new_keyboard_line2, new_keyboard_line3])
             bot.sendMessage(bot_chatId, "Wie weit soll die Markise raus??", reply_markup=markup)
 
+        elif query_data.get("cb") == "shutterstop":
+            ret = client.publish(markise_topic + "/shutterstop", query_data.get("message"))
+            bot.answerCallbackQuery(query_id, text="Markise gestoppt", show_alert=0)
         elif query_data.get("cb") == "shutterposition":
-            ret = client.publish(markise_topic, query_data.get("target"))
+            ret = client.publish(markise_topic + "/shutterposition", query_data.get("target"))
             bot.answerCallbackQuery(query_id, text="Markise ist unterwegs", show_alert=0)
         elif query_data.get("cb") == "rss":
             myCommon.debug_log("RSS FEEDS")
