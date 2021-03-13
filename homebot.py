@@ -223,7 +223,8 @@ def main(argv=None):
         elif query_data.get("cb") == "markise":
             possible_positions = []
             for fixed_position in 0, 40, 80, 100:
-                possible_positions.append(fixed_position)
+                if fixed_position != int(markise_position):
+                    possible_positions.append(fixed_position)
 
             new_keyboard_line2 = []
             for adjustment in -10, 10:
