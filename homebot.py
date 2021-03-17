@@ -175,7 +175,7 @@ def main(argv=None):
             if command in ["help", "start"]:
                 entity = bot.getChat(chat_id)
                 helptext = "Hallo %s, diese Funktionen sind verfügbar" % (entity['first_name'])
-                bot.sendMessage(chat_id, helptext, reply_markup=keyboard)
+                my_send_message(msg = helptext, reply_markup=keyboard)
                 return
             else:
                 myCommon.debug_log("DEBUG: " + command + str(type(command)))
@@ -213,7 +213,7 @@ def main(argv=None):
                     qrwifi = qrwifi + passwd.replace('$', '\$').replace(';', '\;') + ";;"
             imgpath = generate_qr(qrwifi)
             bot.sendPhoto(bot_chatId, photo=open(imgpath, 'rb'))
-            bot.sendMessage(bot_chatId, passwd)
+            my_send_message(msg = passwd)
 
         elif query_data.get("cb") == "dhcphistory":
             for item in dhcp_queue:
@@ -244,7 +244,7 @@ def main(argv=None):
             new_keyboard_line3 = build_inline_keyboard(new_keyboard_line3, "Stop", '{"cb":"shutterstop", "message": "1"}')
 
             markup = InlineKeyboardMarkup(inline_keyboard=[new_keyboard_line1, new_keyboard_line2, new_keyboard_line3])
-            bot.sendMessage(bot_chatId, "Wie weit soll die Markise raus??", reply_markup=markup)
+            my_send_message(msg = "Wie weit soll die Markise raus??", reply_markup=markup)
 
         elif query_data.get("cb") == "shutterstop":
             ret = client.publish(markise_topic + "/shutterstop", query_data.get("message"))
@@ -262,9 +262,9 @@ def main(argv=None):
                     buttontext = feed['FEED_NAME'] + " (" + str(feed['COUNT']) + ")"
                     feedkeyboard.append(InlineKeyboardButton(text=buttontext, callback_data='{"cb": "feedid", "fid": "' + str(feed['rssid']) + '"}'))
                 markup = InlineKeyboardMarkup(inline_keyboard=[feedkeyboard])
-                bot.sendMessage(bot_chatId, "Welchen Feed?", reply_markup=markup)
+                my_send_message(msg = "Welchen Feed?", reply_markup=markup)
             else:
-                bot.sendMessage(bot_chatId, "Keine neuen Nachrichten")
+                my_send_message(msg = "Keine neuen Nachrichten")
 
         elif query_data.get("cb") == "feedid":
             feedid = query_data['fid']
@@ -287,7 +287,7 @@ def main(argv=None):
                      InlineKeyboardButton(text='Ja', callback_data=callback_yes)],
                     [InlineKeyboardButton(text='RSS Feed wechseln', callback_data='{"cb": "rss"}')]
                     ])
-                bot.sendMessage(bot_chatId, feedtitle + "\n" + feedlink, reply_markup=markup)
+                my_send_message(msg = feedtitle + "\n" + feedlink, reply_markup=markup)
         else:
             print("unklar")
             print(query_data)
@@ -300,6 +300,7 @@ def main(argv=None):
         disable_web_page_preview = bool(kwargs.get('disable_web_page_preview', False))
         edit = kwargs.get('edit', (0, 0))
         parse_mode = kwargs.get('parse_mode', 'HTML')
+        reply_markup = kwargs.get('reply_markup', None)
 
         try:
             myCommon.debug_log("bot_chatId: " + str(bot_chatId) + " message: " + str(msg))
@@ -308,7 +309,7 @@ def main(argv=None):
                 editable = bot.editMessageText(edit, str(msg))
             else:
                 try:
-                    editable = bot.sendMessage(bot_chatId, str(msg), parse_mode=parse_mode, disable_web_page_preview=disable_web_page_preview)
+                    editable = bot.sendMessage(bot_chatId, str(msg), parse_mode=parse_mode, disable_web_page_preview=disable_web_page_preview, reply_markup=reply_markup)
                 except:
                     myCommon.debug_log("bot sendMessage error")
 
