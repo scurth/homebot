@@ -78,7 +78,7 @@ def main(argv=None):
             else:
                 myCommon.debug_log("lastMarkiseMsg is defined.")
 
-            lastMarkiseMsg = my_send_message("Markise auf Position:" + str(markise_position), "HTML", False, lastMarkiseMsg)
+            lastMarkiseMsg = my_send_message(msg="Markise auf Position:" + str(markise_position), edit=lastMarkiseMsg)
             myCommon.debug_log(lastMarkiseMsg)
             # Stop button
             # am ende das keyboard mit den auswahl
@@ -110,7 +110,7 @@ def main(argv=None):
         elif msg.topic.startswith(gargentor_callback):
             toggle_channel = mqtt_msg_json_obj.get("channel")
             if int(toggle_channel) == int(gargentor_channel):
-                my_send_message("Gargentor geschaltet")
+                my_send_message(msg="Gargentor geschaltet")
             myCommon.debug_log(mqtt_msg_json_obj)
         else:
             myCommon.debug_log("ignoring topic: ", msg.topic)
@@ -217,7 +217,7 @@ def main(argv=None):
 
         elif query_data.get("cb") == "dhcphistory":
             for item in dhcp_queue:
-                my_send_message(item)
+                my_send_message(msg=item)
         elif query_data.get("cb") == "garagedoor":
             ret = client.publish(gargentor_topic, '{"channel":' + gargentor_channel + ', "value": true, "time": 1000}')
         elif query_data.get("cb") == "markise":
@@ -294,13 +294,18 @@ def main(argv=None):
 
         bot.answerCallbackQuery(query_id, text="Fertig", show_alert=0)
 
-    def my_send_message(msg, parse_mode="HTML", disable_web_page_preview=False, edit=(0, 0)):
+    def my_send_message(**kwargs):
         global editable
+        msg = kwargs.get('msg', 'empty')
+        disable_web_page_preview = bool(kwargs.get('disable_web_page_preview', False))
+        edit = kwargs.get('edit', (0, 0))
+        parse_mode = kwargs.get('parse_mode', 'HTML')
+
         try:
             myCommon.debug_log("bot_chatId: " + str(bot_chatId) + " message: " + str(msg))
-            myCommon.debug_log("parse_mode: " + str(parse_mode) + " disable_web_page_preview: " + str(disable_web_page_preview))
+            myCommon.debug_log("parse_mode: " + str(parse_mode) + " disable_web_page_preview: " + str(disable_web_page_preview) + "edit:" + str(edit))
             if edit != (0, 0):
-                editable = bot.editMessageText(editable, str(msg))
+                editable = bot.editMessageText(edit, str(msg))
             else:
                 try:
                     editable = bot.sendMessage(bot_chatId, str(msg), parse_mode=parse_mode, disable_web_page_preview=disable_web_page_preview)
