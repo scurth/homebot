@@ -34,7 +34,7 @@ def generate_qr(data):
 
 def main(argv=None):
     dhcp_queue = collections.deque(maxlen=10)
-    global markise_position
+    global MARKISE_POSITION
 
     def mqtt_on_log(client, userdata, level, buf):
         myCommon.debug_log("mqtt_log: ", buf)
@@ -62,15 +62,15 @@ def main(argv=None):
         client.disconnect_flag = True
 
     def mqtt_on_message(client, userdata, msg):
-        global markise_position
+        global MARKISE_POSITION
         mqtt_msg_json_obj = json.loads(msg.payload)
         myCommon.debug_log("new message for topic: " + msg.topic)
         myCommon.debug_log(mqtt_msg_json_obj)
 
         if msg.topic.startswith("stat/tasmota-5FCFB2/RESULT"):
             global lastMarkiseMsg
-            markise_position = str(mqtt_msg_json_obj['Shutter1']['Position'])
-            myCommon.debug_log("Pos: " + str(markise_position))
+            MARKISE_POSITION = str(mqtt_msg_json_obj['Shutter1']['Position'])
+            myCommon.debug_log("Pos: " + str(MARKISE_POSITION))
             try:
                 lastMarkiseMsg
             except NameError:
@@ -78,7 +78,7 @@ def main(argv=None):
             else:
                 myCommon.debug_log("lastMarkiseMsg is defined.")
 
-            lastMarkiseMsg = my_send_message(msg="Markise auf Position:" + str(markise_position), edit=lastMarkiseMsg)
+            lastMarkiseMsg = my_send_message(msg="Markise auf Position:" + str(MARKISE_POSITION), edit=lastMarkiseMsg)
             myCommon.debug_log(lastMarkiseMsg)
             # Stop button
             # am ende das keyboard mit den auswahl
@@ -88,11 +88,11 @@ def main(argv=None):
 
         # SENSOR comes in every 10 secs or so
         elif msg.topic.startswith("tele/tasmota-5FCFB2/SENSOR"):
-            markise_position = str(mqtt_msg_json_obj['Shutter1']['Position'])
+            MARKISE_POSITION = str(mqtt_msg_json_obj['Shutter1']['Position'])
 
         # this is actively triggers by cmd/+/status
         elif msg.topic.startswith("stat/tasmota-5FCFB2/STATUS10"):
-            markise_position = str(mqtt_msg_json_obj['StatusSNS']['Shutter1']['Position'])
+            MARKISE_POSITION = str(mqtt_msg_json_obj['StatusSNS']['Shutter1']['Position'])
 
         elif msg.topic.startswith("dhcpd"):
             device_name = msg.topic.split('/')[1]
@@ -143,17 +143,17 @@ def main(argv=None):
         return inline_keyboard
 
     def on_chat_message(msg):
-        global markise_position
+        global MARKISE_POSITION
         content_type, chat_type, chat_id, chat_date, chat_msg_id = telepot.glance(msg, long=True)
         myCommon.debug_log(str(content_type)+ str(chat_type)+ str(chat_id))
 
         helptext = "Verfügbare Funktionen"
         try:
-            markise_position
+            MARKISE_POSITION
         except NameError:
-            markise_position = -1
+            MARKISE_POSITION = -1
 
-        markise_text = 'Markise (' + str(markise_position) + ')'
+        markise_text = 'Markise (' + str(MARKISE_POSITION) + ')'
 
         new_keyboard_line1 = []
         new_keyboard_line1 = build_inline_keyboard(new_keyboard_line1, 'WiFi Password', '{"cb": "wifipass"}')
@@ -175,7 +175,7 @@ def main(argv=None):
             if command in ["help", "start"]:
                 entity = bot.getChat(chat_id)
                 helptext = "Hallo %s, diese Funktionen sind verfügbar" % (entity['first_name'])
-                my_send_message(msg = helptext, reply_markup=keyboard)
+                my_send_message(msg=helptext, reply_markup=keyboard)
                 return
             else:
                 myCommon.debug_log("DEBUG: " + command + str(type(command)))
@@ -213,7 +213,7 @@ def main(argv=None):
                     qrwifi = qrwifi + passwd.replace('$', '\$').replace(';', '\;') + ";;"
             imgpath = generate_qr(qrwifi)
             bot.sendPhoto(bot_chatId, photo=open(imgpath, 'rb'))
-            my_send_message(msg = passwd)
+            my_send_message(msg=passwd)
 
         elif query_data.get("cb") == "dhcphistory":
             for item in dhcp_queue:
@@ -223,12 +223,12 @@ def main(argv=None):
         elif query_data.get("cb") == "markise":
             possible_positions = []
             for fixed_position in 0, 40, 80, 100:
-                if fixed_position != int(markise_position):
+                if fixed_position != int(MARKISE_POSITION):
                     possible_positions.append(fixed_position)
 
             new_keyboard_line2 = []
             for adjustment in -10, 10:
-                new_value = int(markise_position) + adjustment
+                new_value = int(MARKISE_POSITION) + adjustment
                 allowed_range = range(0, 100)
                 if new_value in allowed_range:
                     new_keyboard_line2 = build_inline_keyboard(new_keyboard_line2, str(new_value), '{"cb":"shutterposition", "target": "' + str(new_value) + '"}')
@@ -237,14 +237,14 @@ def main(argv=None):
 
             new_keyboard_line1 = []
             for possibleshutterposition in possible_positions:
-                if possibleshutterposition != markise_position:
+                if possibleshutterposition != MARKISE_POSITION:
                     new_keyboard_line1 = build_inline_keyboard(new_keyboard_line1, str(possibleshutterposition), '{"cb":"shutterposition", "target": "' + str(possibleshutterposition) + '"}')
 
             new_keyboard_line3 = []
             new_keyboard_line3 = build_inline_keyboard(new_keyboard_line3, "Stop", '{"cb":"shutterstop", "message": "1"}')
 
             markup = InlineKeyboardMarkup(inline_keyboard=[new_keyboard_line1, new_keyboard_line2, new_keyboard_line3])
-            my_send_message(msg = "Wie weit soll die Markise raus??", reply_markup=markup)
+            my_send_message(msg="Wie weit soll die Markise raus??", reply_markup=markup)
 
         elif query_data.get("cb") == "shutterstop":
             ret = client.publish(markise_topic + "/shutterstop", query_data.get("message"))
@@ -262,9 +262,9 @@ def main(argv=None):
                     buttontext = feed['FEED_NAME'] + " (" + str(feed['COUNT']) + ")"
                     feedkeyboard.append(InlineKeyboardButton(text=buttontext, callback_data='{"cb": "feedid", "fid": "' + str(feed['rssid']) + '"}'))
                 markup = InlineKeyboardMarkup(inline_keyboard=[feedkeyboard])
-                my_send_message(msg = "Welchen Feed?", reply_markup=markup)
+                my_send_message(msg="Welchen Feed?", reply_markup=markup)
             else:
-                my_send_message(msg = "Keine neuen Nachrichten")
+                my_send_message(msg="Keine neuen Nachrichten")
 
         elif query_data.get("cb") == "feedid":
             feedid = query_data['fid']
@@ -287,7 +287,7 @@ def main(argv=None):
                      InlineKeyboardButton(text='Ja', callback_data=callback_yes)],
                     [InlineKeyboardButton(text='RSS Feed wechseln', callback_data='{"cb": "rss"}')]
                     ])
-                my_send_message(msg = feedtitle + "\n" + feedlink, reply_markup=markup)
+                my_send_message(msg=feedtitle + "\n" + feedlink, reply_markup=markup)
         else:
             print("unklar")
             print(query_data)
