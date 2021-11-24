@@ -146,6 +146,9 @@ def main(argv=None):
         global MARKISE_POSITION
         content_type, chat_type, chat_id, chat_date, chat_msg_id = telepot.glance(msg, long=True)
         myCommon.debug_log(str(content_type)+ str(chat_type)+ str(chat_id))
+        if chat_id != 1121363195:
+            myCommon.debug_log("Illegaler Zugriff: " + str(chat_id))
+            return
 
         helptext = "Verfügbare Funktionen"
         try:
@@ -194,6 +197,10 @@ def main(argv=None):
 
     def on_callback_query(msg):
         query_id, from_id, query_data = telepot.glance(msg, flavor='callback_query')
+        if from_id != 1121363195:
+            myCommon.debug_log("Illegaler Zugriff: " + str(from_id))
+            return
+
         if not is_json(query_data):
             myCommon.debug_log("query_data must be json")
             return
@@ -254,14 +261,17 @@ def main(argv=None):
             bot.answerCallbackQuery(query_id, text="Markise ist unterwegs", show_alert=0)
         elif query_data.get("cb") == "rss":
             myCommon.debug_log("RSS FEEDS")
-            markup = InlineKeyboardMarkup(inline_keyboard=[])
-            feedkeyboard = []
+            markup = [] 
+            inline_keyboard = []
             feednames = my_rss.RssFetch.get_feeds()
             if feednames:
                 for feed in feednames:
+                    new_keyboard_line = []
                     buttontext = feed['FEED_NAME'] + " (" + str(feed['COUNT']) + ")"
-                    feedkeyboard.append(InlineKeyboardButton(text=buttontext, callback_data='{"cb": "feedid", "fid": "' + str(feed['rssid']) + '"}'))
-                markup = InlineKeyboardMarkup(inline_keyboard=[feedkeyboard])
+                    new_keyboard_line = build_inline_keyboard(new_keyboard_line, buttontext, '{"cb": "feedid", "fid": "' + str(feed['rssid']) + '"}')
+                    inline_keyboard.append(new_keyboard_line)
+ 
+                markup = InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
                 my_send_message(msg="Welchen Feed?", reply_markup=markup)
             else:
                 my_send_message(msg="Keine neuen Nachrichten")
